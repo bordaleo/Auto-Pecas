@@ -1,0 +1,69 @@
+{% extends "admin/painel_base.html" %}
+{% block painel_title %}Alertas{% endblock %}
+{% block painel_main %}
+<div id="err" class="err-box"></div>
+<section class="painel-section" style="margin-bottom:16px">
+    <h2 class="section-h">Alertas enviados</h2>
+    <p class="muted" style="margin-bottom:12px">Registos gravados quando um alerta é <strong>enviado</strong> ao Discord ou e-mail. O debounce pode omitir repetições no envio; aqui aparece apenas o que foi de facto disparado.</p>
+    <div class="pager-bar" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">
+        <button type="button" id="btnPrev" class="painel-btn">Anterior</button>
+        <button type="button" id="btnNext" class="painel-btn">Próxima</button>
+        <span id="pgInfo" class="muted" style="margin:0"></span>
+    </div>
+</section>
+<div id="mount"></div>
+{% endblock %}
+{% block painel_scripts %}
+<script>
+(function () {
+    const mount = document.getElementById('mount');
+    const err = document.getElementById('err');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnNext = document.getElementById('btnNext');
+    const pgInfo = document.getElementById('pgInfo');
+    const limit = 40;
+    let offset = 0;
+    let total = 0;
+
+    function showErr(m) { err.textContent = m || ''; err.classList.toggle('show', !!m); }
+
+    function render(rows) {
+        if (!rows || !rows.length) {
+            mount.innerHTML = '<section class="painel-section"><p class="muted" style="margin:0">Nenhum alerta registado ainda.</p></section>';
+            return;
+        }
+        let h = '<section class="painel-section"><h2 class="section-h">Histórico</h2><table class="data"><thead><tr><th>Quando</th><th>Categoria</th><th>Mensagem</th><th></th></tr></thead><tbody>';
+        rows.forEach(function (r) {
+            const rid = 'ex-' + r.id;
+            h += '<tr><td style="white-space:nowrap">' + esc(r.created_at.replace('T',' ').slice(0,19)) + '</td><td>' + esc(r.category) + '</td><td style="max-width:280px;overflow:hidden;text-overflow:ellipsis">' + esc((r.message || '').slice(0,120)) + '</td><td><button type="button" class="tgl" data-rid="' + esc(rid) + '" style="cursor:pointer;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--panel);color:var(--accent)">Ver</button></td></tr>';
+            h += '<tr id="' + esc(rid) + '" style="display:none"><td colspan="4" style="background:#0d1117;font-size:0.8rem;white-space:pre-wrap;max-height:240px;overflow:auto">' + esc(r.body_excerpt || r.detail || '') + '</td></tr>';
+        });
+        h += '</tbody></table></section>';
+        mount.innerHTML = h;
+        mount.querySelectorAll('.tgl').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const rid = btn.getAttribute('data-rid');
+                const row = rid ? document.getElementById(rid) : null;
+                if (row) row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+            });
+        });
+    }
+
+    async function load() {
+        showErr('');
+        const res = await painelFetch('/painel/ops-events?limit=' + limit + '&offset=' + offset);
+        if (!res.ok) { const j = await res.json().catch(function(){return{};}); showErr(j.detail || 'Erro'); return; }
+        const data = await res.json();
+        total = data.total || 0;
+        pgInfo.textContent = 'Total ' + total + ' · offset ' + offset;
+        render(data.results || []);
+        btnPrev.disabled = offset <= 0;
+        btnNext.disabled = offset + limit >= total;
+    }
+
+    btnPrev.addEventListener('click', function () { offset = Math.max(0, offset - limit); load(); });
+    btnNext.addEventListener('click', function () { offset = offset + limit; load(); });
+    load();
+})();
+</script>
+{% endblock %}

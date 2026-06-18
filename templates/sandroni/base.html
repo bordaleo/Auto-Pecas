@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AutoPeças Sandroni{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}AutoPeças Sandroni — peças automotivas originais e paralelas. Busque por nome, OEM ou veículo.{% endblock %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/sandroni/app.css?v=8">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='9' fill='%230c1a2e'/%3E%3Ccircle cx='24' cy='24' r='10' fill='%23e85d04'/%3E%3Ctext x='24' y='29' text-anchor='middle' fill='white' font-family='Arial' font-weight='800' font-size='16'%3ES%3C/text%3E%3C/svg%3E" type="image/svg+xml">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- Cabeçalho principal -->
+    <header class="site-header">
+        <div class="wrap header-row">
+            <a href="/" class="logo" aria-label="AutoPeças Sandroni — Início">
+                {% include "sandroni/includes/logo_icon.html" %}
+                <span class="logo-text">
+                    <span class="logo-line1">AUTOPEÇAS</span>
+                    <span class="logo-line2">SANDRONI</span>
+                </span>
+            </a>
+
+            <form class="search-form" action="/pecas/" method="get" role="search">
+                <input type="search" name="q" id="header-search" placeholder="Buscar peça, código OEM, marca ou veículo..." autocomplete="off">
+                <button type="submit" class="search-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    Buscar
+                </button>
+            </form>
+
+            <div class="header-actions">
+                <button type="button" class="action-btn" id="btn-auth" title="Entrar">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span>Entrar</span>
+                </button>
+                <a href="/pedidos/" class="action-btn" title="Meus pedidos">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <span>Pedidos</span>
+                </a>
+                <button type="button" class="action-btn action-cart" id="btn-open-cart" title="Carrinho">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                    <span>Carrinho</span>
+                    <em class="badge" id="cart-count">0</em>
+                </button>
+                <button type="button" class="mobile-toggle" id="mobile-toggle" aria-label="Menu">☰</button>
+            </div>
+        </div>
+
+        <!-- Navegação categorias -->
+        <nav class="cat-nav" id="cat-nav">
+            <div class="wrap cat-nav-inner">
+                <a href="/pecas/" class="cat-nav-all">Todas as peças</a>
+                <div class="cat-nav-list" id="cat-nav-list"></div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Menu mobile -->
+    <div class="mobile-menu" id="mobile-menu" hidden>
+        <div class="mobile-menu-backdrop" data-close-mobile></div>
+        <div class="mobile-menu-panel">
+            <div class="mobile-menu-head">
+                <strong>AUTOPEÇAS SANDRONI</strong>
+                <button type="button" data-close-mobile>×</button>
+            </div>
+            <nav class="mobile-menu-links">
+                <a href="/">Início</a>
+                <a href="/pecas/">Catálogo</a>
+                <a href="/carrinho/">Carrinho</a>
+                <a href="/pedidos/">Pedidos</a>
+                <a href="/perfil/">Minha conta</a>
+                <a href="/gerenciar/" id="mobile-manage" hidden>Gerenciar peças</a>
+            </nav>
+            <div class="mobile-menu-cats" id="mobile-cats"></div>
+        </div>
+    </div>
+
+    <main class="site-main">{% block content %}{% endblock %}</main>
+
+    <!-- Rodapé -->
+    <footer class="site-footer">
+        <div class="wrap footer-grid">
+            <div class="footer-brand">
+                <div class="logo logo-footer">
+                    {% include "sandroni/includes/logo_icon.html" %}
+                    <span class="logo-text">
+                        <span class="logo-line1">AUTOPEÇAS</span>
+                        <span class="logo-line2">SANDRONI</span>
+                    </span>
+                </div>
+                <p>Há mais de 40 anos no mercado exercendo os melhores serviços no seu veículo. Estoque real, preços justos e entrega para todo o Brasil.</p>
+            </div>
+            <div>
+                <h4>Loja</h4>
+                <a href="/pecas/">Catálogo</a>
+                <a href="/pecas/?featured=1">Promoções</a>
+                <a href="/carrinho/">Carrinho</a>
+                <a href="/checkout/">Finalizar compra</a>
+            </div>
+            <div>
+                <h4>Conta</h4>
+                <a href="/pedidos/">Histórico de pedidos</a>
+                <a href="/perfil/">Meus dados</a>
+                <a href="#" id="footer-login">Entrar / Cadastrar</a>
+            </div>
+            <div>
+                <h4>Contato</h4>
+                <p>Retirada: Rua São Sabino, 262</p>
+                <a href="/whatsapp/" class="footer-whatsapp" id="footer-whatsapp" target="_blank" rel="noopener">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.435 9.884-9.881 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+                    WhatsApp
+                </a>
+                <p>Pagamento seguro via Mercado Pago</p>
+                <p>PIX · Cartão · Boleto</p>
+            </div>
+        </div>
+        <div class="footer-bottom wrap">
+            <span>© {% now "Y" %} AutoPeças Sandroni. Todos os direitos reservados.</span>
+        </div>
+    </footer>
+
+    <!-- Modal auth -->
+    <div class="modal" id="auth-modal" hidden>
+        <div class="modal-backdrop" data-close-modal></div>
+        <div class="modal-box">
+            <button type="button" class="modal-x" data-close-modal>×</button>
+            <div class="modal-logo">AUTOPEÇAS SANDRONI</div>
+            <div class="tabs">
+                <button type="button" class="tab active" data-tab="login">Entrar</button>
+                <button type="button" class="tab" data-tab="register">Cadastrar</button>
+            </div>
+            <form id="login-form" class="form">
+                <label><span>Email</span><input type="email" name="email" required autocomplete="email"></label>
+                <label><span>Senha</span><input type="password" name="password" required autocomplete="current-password"></label>
+                <button type="submit" class="btn btn-primary btn-full">Entrar</button>
+                <button type="button" class="btn-link" id="btn-forgot">Esqueci minha senha</button>
+            </form>
+            <form id="register-form" class="form" hidden>
+                <label><span>Nome completo</span><input type="text" name="name" required></label>
+                <label><span>Email</span><input type="email" name="email" required></label>
+                <label><span>Telefone</span><input type="tel" name="phone"></label>
+                <label><span>Senha (mín. 6)</span><input type="password" name="password" required minlength="6" autocomplete="new-password"></label>
+                <label><span>Confirmar senha</span><input type="password" name="password_confirm" required minlength="6" autocomplete="new-password"></label>
+                <button type="submit" class="btn btn-primary btn-full">Criar conta</button>
+            </form>
+            <form id="verify-form" class="form" hidden>
+                <p class="form-hint">Enviamos um código para seu email. Digite abaixo:</p>
+                <label><span>Código de 6 dígitos</span><input type="text" name="code" required maxlength="6" pattern="[0-9]{6}" inputmode="numeric"></label>
+                <button type="submit" class="btn btn-primary btn-full">Verificar email</button>
+            </form>
+            <p class="form-msg" id="auth-message"></p>
+        </div>
+    </div>
+
+    <!-- Drawer carrinho -->
+    <div class="drawer" id="cart-drawer" hidden>
+        <div class="drawer-backdrop" data-close-drawer></div>
+        <aside class="drawer-panel">
+            <div class="drawer-head">
+                <h2>Seu carrinho</h2>
+                <button type="button" data-close-drawer aria-label="Fechar">×</button>
+            </div>
+            <div class="drawer-body" id="cart-drawer-items"></div>
+            <div class="drawer-foot">
+                <div class="drawer-total"><span>Total</span><strong id="cart-drawer-total">R$ 0,00</strong></div>
+                <a href="/checkout/" class="btn btn-primary btn-full">Finalizar compra</a>
+                <a href="/carrinho/" class="btn btn-outline btn-full">Ver carrinho</a>
+            </div>
+        </aside>
+    </div>
+
+    <div class="toasts" id="toast-container"></div>
+
+    <a href="/whatsapp/" class="whatsapp-fab" id="whatsapp-fab" target="_blank" rel="noopener" aria-label="Falar no WhatsApp" title="Falar no WhatsApp" hidden>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.435 9.884-9.881 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+        <span class="whatsapp-fab-label">Fale conosco</span>
+    </a>
+
+    <script>window.MP_PUBLIC_KEY = "{{ mercadopago_public_key }}";</script>
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
+    <script src="/static/sandroni/app.js?v=8"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

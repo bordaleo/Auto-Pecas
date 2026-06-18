@@ -1,0 +1,15 @@
+{% extends "sandroni/base.html" %}
+{% block title %}Minha conta — AutoPeças Sandroni{% endblock %}
+
+{% block content %}
+<div class="page-banner">
+    <div class="wrap"><h1>Minha conta</h1></div>
+</div>
+<section class="section">
+    <div class="wrap"><div id="profile-page" class="panel"><p class="loading">Carregando...</p></div></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>document.addEventListener('DOMContentLoaded', () => Sandroni.loadProfile());</script>
+{% endblock %}

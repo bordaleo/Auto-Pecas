@@ -1,0 +1,19 @@
+{% extends "sandroni/base.html" %}
+{% block title %}Peça — AutoPeças Sandroni{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="wrap" id="product-detail">
+        <p class="loading">Carregando peça...</p>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const slug = window.location.pathname.split('/').filter(Boolean).pop();
+    Sandroni.loadProduct(slug);
+});
+</script>
+{% endblock %}

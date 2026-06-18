@@ -1,0 +1,104 @@
+{% extends "admin/painel_base.html" %}
+{% block painel_title %}Pedidos{% endblock %}
+{% block painel_head_extra %}
+<style>
+    .pedidos-two-col { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 900px) { .pedidos-two-col { grid-template-columns: 1fr 1fr; } }
+</style>
+{% endblock %}
+{% block painel_main %}
+<div id="err" class="err-box"></div>
+<div id="mount"></div>
+{% endblock %}
+{% block painel_scripts %}
+<script>
+(function () {
+    const mount = document.getElementById('mount');
+    const err = document.getElementById('err');
+    function showErr(m) { err.textContent = m || ''; err.classList.toggle('show', !!m); }
+    async function load() {
+        showErr('');
+        const res = await painelFetch('/painel/dashboard?page=pedidos&days=14');
+        if (!res.ok) { const j = await res.json().catch(function(){return{};}); showErr(j.detail || 'Erro'); return; }
+        const data = await res.json();
+        const o = data.orders || {};
+        const u = data.users || {};
+        const avg = data.per_order_averages_all || {};
+        const avgAp = data.per_order_averages_approved || {};
+        const plans = o.plans || {};
+        let rows = '';
+        Object.keys(plans).forEach(function (k) {
+            const p = plans[k];
+            rows += '<tr><td>' + esc(k) + '</td><td>' + p.total + '</td><td>' + p.approved + '</td></tr>';
+        });
+        const nBase = avg.orders_count != null ? avg.orders_count : 0;
+        const nAppr = avgAp.orders_count != null ? avgAp.orders_count : 0;
+        mount.innerHTML =
+            '<p class="painel-meta"><span class="ts">Atualizado: ' + esc((data.generated_at || '').replace('T',' ').slice(0,19)) + '</span></p>' +
+
+            '<div class="pedidos-two-col" style="margin-bottom:16px">' +
+            '<section class="painel-section" style="margin-bottom:0">' +
+            '<h2 class="section-h">Contas</h2>' +
+            '<p class="muted">Utilizadores com conta ativa na plataforma.</p>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi kpi--accent2"><div class="v">' + (u.active_without_orders != null ? u.active_without_orders : '—') + '</div><div class="l">Sem nenhum pedido</div></div>' +
+            '<div class="kpi kpi--ok"><div class="v">' + (u.active_with_orders != null ? u.active_with_orders : '—') + '</div><div class="l">Com pelo menos um pedido</div></div>' +
+            '<div class="kpi"><div class="v">' + (u.total != null ? u.total : '—') + '</div><div class="l">Utilizadores (total na base)</div></div>' +
+            '</div></section>' +
+            '<section class="painel-section" style="margin-bottom:0">' +
+            '<h2 class="section-h">Resumo de pedidos</h2>' +
+            '<p class="muted">Volume e estado. Pagamentos em <a href="/painel/pagamentos/">Pagamentos</a>.</p>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi"><div class="v">' + (o.total != null ? o.total : '—') + '</div><div class="l">Total</div></div>' +
+            '<div class="kpi kpi--accent2"><div class="v">' + (o.pending != null ? o.pending : '—') + '</div><div class="l">Pendentes</div></div>' +
+            '<div class="kpi kpi--ok"><div class="v">' + (o.approved != null ? o.approved : '—') + '</div><div class="l">Aprovados</div></div>' +
+            '<div class="kpi"><div class="v">' + (o.rejected != null ? o.rejected : '—') + '</div><div class="l">Rejeitados</div></div>' +
+            '<div class="kpi"><div class="v">' + (o.created_today != null ? o.created_today : '—') + '</div><div class="l">Criados hoje</div></div>' +
+            '</div></section></div>' +
+
+            '<section class="painel-section">' +
+            '<h2 class="section-h">Médias de personalização (todos os pedidos)</h2>' +
+            '<div class="painel-callout">' +
+            '<strong>Como é calculado:</strong> cada pedido tem uma linha de personalização. Para <em>cada</em> uma contamos fotos (polaroids), perguntas de quiz com texto, músicas YouTube <em>distintas</em>, mensagens na lista Amo e unidades de cartinha (1 se há mensagem favorita + cada entrada em mensagens personalizadas). ' +
+            'Somamos esses números em <strong>todos</strong> os estados (pendente, aprovado, rejeitado) e dividimos pelo número de personalizações (<strong>' + nBase + '</strong>). ' +
+            'É uma média aritmética do que foi preenchido, não pondera por plano nem por valor pago.' +
+            '</div>' +
+            '<p class="muted" style="margin-top:0">' + esc(avg.definition || '') + '</p>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi"><div class="v">' + fmtNum(avg.photos_polaroids, 2) + '</div><div class="l">Fotos por pedido</div></div>' +
+            '<div class="kpi"><div class="v">' + fmtNum(avg.quiz_questions, 2) + '</div><div class="l">Perguntas de quiz</div></div>' +
+            '<div class="kpi kpi--accent2"><div class="v">' + fmtNum(avg.music_unique_tracks, 2) + '</div><div class="l">Músicas distintas</div></div>' +
+            '<div class="kpi kpi--ok"><div class="v">' + fmtNum(avg.amo_messages, 2) + '</div><div class="l">Mensagens Amo</div></div>' +
+            '<div class="kpi"><div class="v">' + fmtNum(avg.cartinha_units, 2) + '</div><div class="l">Cartinha (unidades)</div></div>' +
+            '</div>' +
+            (nAppr > 0
+                ? '<p class="muted" style="margin-top:14px;margin-bottom:6px"><strong>Referência</strong> — mesmas métricas só entre pedidos <em>aprovados</em> (' + nAppr + ' sites):</p>' +
+                  '<div class="painel-subgrid">' +
+                  '<div class="kpi"><div class="v">' + fmtNum(avgAp.photos_polaroids, 2) + '</div><div class="l">Fotos</div></div>' +
+                  '<div class="kpi"><div class="v">' + fmtNum(avgAp.quiz_questions, 2) + '</div><div class="l">Quiz</div></div>' +
+                  '<div class="kpi"><div class="v">' + fmtNum(avgAp.music_unique_tracks, 2) + '</div><div class="l">Músicas</div></div>' +
+                  '<div class="kpi"><div class="v">' + fmtNum(avgAp.amo_messages, 2) + '</div><div class="l">Amo</div></div>' +
+                  '<div class="kpi"><div class="v">' + fmtNum(avgAp.cartinha_units, 2) + '</div><div class="l">Cartinha</div></div>' +
+                  '</div>'
+                : '') +
+            '</section>' +
+
+            '<section class="painel-section">' +
+            '<h2 class="section-h">Pedidos criados hoje</h2>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi"><div class="v">' + ((o.created_today_by_status && o.created_today_by_status.pending) || 0) + '</div><div class="l">Pendentes</div></div>' +
+            '<div class="kpi kpi--ok"><div class="v">' + ((o.created_today_by_status && o.created_today_by_status.approved) || 0) + '</div><div class="l">Aprovados</div></div>' +
+            '<div class="kpi"><div class="v">' + ((o.created_today_by_status && o.created_today_by_status.rejected) || 0) + '</div><div class="l">Rejeitados</div></div>' +
+            '</div></section>' +
+
+            '<section class="painel-section">' +
+            '<h2 class="section-h">Por plano</h2>' +
+            '<table class="data"><thead><tr><th>Plano</th><th>Total</th><th>Aprovados</th></tr></thead><tbody>' +
+            (rows || '<tr><td colspan="3">Sem dados</td></tr>') + '</tbody></table>' +
+            '<p class="muted" style="margin-top:14px;margin-bottom:0">Edição em massa: <a href="/admin/api/order/" target="_blank" rel="noopener">Django Admin → Pedidos</a>.</p>' +
+            '</section>';
+    }
+    load();
+})();
+</script>
+{% endblock %}

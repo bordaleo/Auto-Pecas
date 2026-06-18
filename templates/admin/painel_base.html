@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block painel_title %}Painel{% endblock %} — AutoPeças Sandroni</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --panel: #161b22;
+            --border: #30363d;
+            --text: #e6edf3;
+            --muted: #8b949e;
+            --accent: #58a6ff;
+            --accent2: #a371f7;
+            --danger: #f85149;
+            --ok: #3fb950;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; }
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+        .painel-shell {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-height: 100vh;
+        }
+        .painel-top {
+            flex-shrink: 0;
+            background: linear-gradient(180deg, #1a1f2a 0%, var(--panel) 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 18px;
+        }
+        .painel-top h1 {
+            font-size: 1.125rem;
+            font-weight: 650;
+            letter-spacing: 0.02em;
+            color: #fff;
+        }
+        .painel-top .sub { font-size: 0.8125rem; color: var(--muted); margin-top: 4px; max-width: 52rem; }
+        .painel-nav {
+            flex-shrink: 0;
+            padding: 10px 18px 12px;
+            background: #0d1016;
+            border-bottom: 1px solid var(--border);
+        }
+        .painel-nav-rows { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+        .painel-nav-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 12px;
+        }
+        .painel-nav-row--sub { padding-top: 2px; border-top: 1px solid rgba(48,54,61,0.65); }
+        .painel-nav-hint {
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--muted);
+            width: 100%;
+            margin-bottom: -2px;
+        }
+        @media (min-width: 720px) {
+            .painel-nav-hint { width: auto; margin-bottom: 0; min-width: 4.5rem; }
+        }
+        .painel-nav-links { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+        .painel-nav a {
+            display: inline-flex;
+            align-items: center;
+            padding: 7px 12px;
+            border-radius: 8px;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            text-decoration: none;
+            color: var(--text);
+            background: #161b22;
+            border: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        .painel-nav a:hover { border-color: var(--accent); color: var(--accent); }
+        .painel-nav a.active {
+            background: linear-gradient(135deg, rgba(88,166,255,0.22), rgba(163,113,247,0.18));
+            border-color: rgba(88,166,255,0.55);
+            color: #fff;
+        }
+        .painel-nav a.danger { border-color: rgba(248,81,73,0.45); color: #ff8b87; }
+        .painel-nav a.external { color: var(--muted); }
+        .painel-nav a.external:hover { color: var(--accent); }
+        .painel-main {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 18px 18px 32px;
+        }
+        .painel-stack { max-width: 1160px; margin: 0 auto; }
+        .painel-section {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px 20px;
+            margin-bottom: 16px;
+        }
+        .painel-section > h2:first-child,
+        .painel-section > .section-h {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 12px;
+            letter-spacing: 0.02em;
+        }
+        .painel-section .muted:last-child { margin-bottom: 0; }
+        .painel-meta {
+            font-size: 0.8125rem;
+            color: var(--muted);
+            margin-bottom: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+            align-items: center;
+        }
+        .painel-meta time, .painel-meta .ts { font-variant-numeric: tabular-nums; color: #c9d1d9; }
+        .painel-main h2 { font-size: 1.05rem; margin-bottom: 12px; color: #fff; }
+        .muted { color: var(--muted); font-size: 0.8125rem; margin-bottom: 12px; line-height: 1.55; }
+        .muted a { color: var(--accent); }
+        .grid-kpi {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+            gap: 10px;
+            margin-bottom: 4px;
+        }
+        .grid-kpi:last-child { margin-bottom: 0; }
+        .kpi {
+            background: #12161c;
+            border: 1px solid rgba(48,54,61,0.9);
+            border-radius: 10px;
+            padding: 12px 14px;
+            transition: border-color 0.15s ease;
+        }
+        .kpi:hover { border-color: rgba(88,166,255,0.35); }
+        .kpi .v { font-size: 1.28rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+        .kpi .l { font-size: 0.72rem; color: var(--muted); margin-top: 6px; line-height: 1.35; }
+        .kpi.kpi--accent2 .v { color: var(--accent2); }
+        .kpi.kpi--ok .v { color: var(--ok); }
+        .err-box {
+            display: none;
+            padding: 10px 12px;
+            background: rgba(248,81,73,0.12);
+            border: 1px solid rgba(248,81,73,0.35);
+            border-radius: 8px;
+            color: #ffb4b0;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+        }
+        .err-box.show { display: block; }
+        .bar-legend { display: flex; flex-wrap: wrap; gap: 12px 18px; font-size: 0.75rem; color: var(--muted); margin-bottom: 10px; }
+        .bar-legend span { display: inline-flex; align-items: center; gap: 6px; }
+        .bar-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+        .bar-legend .lg-u { background: var(--accent); }
+        .bar-legend .lg-o { background: var(--accent2); }
+        .bar-chart-wrap { overflow-x: auto; margin-bottom: 8px; }
+        .bar-chart { display: flex; align-items: flex-end; gap: 3px; min-height: 120px; padding: 6px 0; }
+        .bar-col { flex: 1; min-width: 8px; max-width: 24px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        .bar-stack { width: 100%; display: flex; flex-direction: column-reverse; gap: 2px; }
+        .bar-u { background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
+        .bar-o { background: var(--accent2); border-radius: 0 0 3px 3px; min-height: 2px; }
+        .bar-col .dt { font-size: 8px; color: var(--muted); writing-mode: vertical-rl; transform: rotate(180deg); max-height: 40px; }
+        table.data {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8125rem;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        table.data th, table.data td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+        table.data th { background: #1c2128; color: var(--muted); font-weight: 600; }
+        table.data a { color: var(--accent); }
+        .badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 999px; background: rgba(63,185,80,0.2); color: var(--ok); }
+        .days-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+        .days-row select {
+            background: var(--panel);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font: inherit;
+        }
+        #_csrf { display: none; }
+        .painel-btn {
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #161b22;
+            color: var(--text);
+            cursor: pointer;
+            font: inherit;
+            font-size: 0.8125rem;
+        }
+        .painel-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+        .painel-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .painel-callout {
+            background: #12161c;
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 0.8125rem;
+            color: var(--muted);
+            line-height: 1.55;
+            margin-bottom: 14px;
+        }
+        .painel-callout strong { color: #e6edf3; }
+        .painel-subgrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed rgba(48,54,61,0.85);
+        }
+        .painel-subgrid .kpi { padding: 10px 12px; }
+        .painel-subgrid .kpi .v { font-size: 1.05rem; }
+        .painel-subgrid .kpi .l { font-size: 0.68rem; }
+    </style>
+    {% block painel_head_extra %}{% endblock %}
+</head>
+<body>
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}" id="_csrf">
+    <div class="painel-shell">
+        <header class="painel-top">
+            <h1>Painel Sandroni</h1>
+            <p class="sub">Indicadores de pedidos, pagamentos e conteúdo. Cada aba carrega um recorte dos dados; só o miolo da página rola.</p>
+        </header>
+        <nav class="painel-nav" aria-label="Seções do painel">
+            <div class="painel-nav-rows">
+                <div class="painel-nav-row">
+                    <span class="painel-nav-hint">Indicadores</span>
+                    <div class="painel-nav-links">
+                        <a href="/painel/visao/" class="{% if painel_tab == 'visao' %}active{% endif %}">Visão geral</a>
+                        <a href="/painel/pedidos/" class="{% if painel_tab == 'pedidos' %}active{% endif %}">Pedidos</a>
+                        <a href="/painel/pagamentos/" class="{% if painel_tab == 'pagamentos' %}active{% endif %}">Pagamentos</a>
+                        <a href="/painel/conteudo/" class="{% if painel_tab == 'conteudo' %}active{% endif %}">Conteúdo</a>
+                        <a href="/painel/audiencia/" class="{% if painel_tab == 'audiencia' %}active{% endif %}">Funil e audiência</a>
+                    </div>
+                </div>
+                <div class="painel-nav-row painel-nav-row--sub">
+                    <span class="painel-nav-hint">Sistema</span>
+                    <div class="painel-nav-links">
+                        <a href="/painel/config/" class="{% if painel_tab == 'config' %}active{% endif %}">Configurações</a>
+                        <a href="/painel/erros/" class="{% if painel_tab == 'erros' %}active{% endif %}">Alertas</a>
+                        <a href="/admin/" class="external" target="_blank" rel="noopener">Django Admin</a>
+                        <a href="/painel/sair/" class="danger">Sair</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        <main class="painel-main">
+            <div class="painel-stack">
+            {% block painel_main %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    <script>
+        const API = (typeof window !== 'undefined' ? window.location.origin : '') + '/api/v1';
+        function csrf() {
+            const el = document.getElementById('_csrf');
+            return el ? el.value : '';
+        }
+        async function painelFetch(path, options) {
+            const headers = new Headers((options && options.headers) || {});
+            const method = ((options && options.method) || 'GET').toUpperCase();
+            if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+                const t = csrf();
+                if (t) headers.set('X-CSRFToken', t);
+            }
+            return fetch(API + path, Object.assign({}, options, { headers, credentials: 'same-origin' }));
+        }
+        function brl(n) {
+            try { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n) || 0); }
+            catch (e) { return 'R$ ' + (Number(n) || 0).toFixed(2); }
+        }
+        function fmtNum(n, decimals) {
+            const d = decimals == null ? 2 : decimals;
+            const x = Number(n);
+            if (Number.isNaN(x)) return '—';
+            try {
+                return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }).format(x);
+            } catch (e) {
+                return x.toFixed(d);
+            }
+        }
+        function esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s == null ? '' : String(s);
+            return d.innerHTML;
+        }
+    </script>
+    {% block painel_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,456 @@
+{% extends "admin/painel_base.html" %}
+{% block painel_title %}Visão geral{% endblock %}
+{% block painel_head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<style>
+    .visao-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px 16px;
+        margin-bottom: 18px;
+    }
+    .visao-toolbar .ts { font-variant-numeric: tabular-nums; color: #c9d1d9; font-size: 0.8125rem; }
+    .visao-toolbar .days-row { margin-bottom: 0; }
+    .visao-hero {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+    .visao-hero-card {
+        background: linear-gradient(145deg, #1c2128 0%, #161b22 100%);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 18px 20px;
+        position: relative;
+        overflow: hidden;
+    }
+    .visao-hero-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        border-radius: 14px 14px 0 0;
+        opacity: 0.85;
+    }
+    .visao-hero-card--users::before { background: var(--accent); }
+    .visao-hero-card--orders::before { background: var(--accent2); }
+    .visao-hero-card--ok::before { background: var(--ok); }
+    .visao-hero-card--pending::before { background: #d29922; }
+    .visao-hero-card .vh-label {
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-bottom: 8px;
+    }
+    .visao-hero-card .vh-value {
+        font-size: 1.85rem;
+        font-weight: 750;
+        font-variant-numeric: tabular-nums;
+        color: #fff;
+        line-height: 1.1;
+    }
+    .visao-hero-card .vh-hint { font-size: 0.75rem; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+    .visao-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    @media (min-width: 960px) {
+        .visao-grid { grid-template-columns: minmax(0, 1fr) 300px; align-items: stretch; }
+    }
+    .visao-chart-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+    .visao-chart-head h2 { margin: 0; font-size: 0.9375rem; font-weight: 600; color: #fff; }
+    .visao-chart-head p { margin: 4px 0 0; font-size: 0.78rem; color: var(--muted); max-width: 36rem; line-height: 1.45; }
+    .visao-canvas-wrap {
+        position: relative;
+        height: 280px;
+        width: 100%;
+    }
+    .visao-canvas-wrap--sm { height: 200px; }
+    .visao-donut-col { display: flex; flex-direction: column; gap: 16px; }
+    .visao-mini-title {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 10px;
+    }
+    .visao-split {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    @media (min-width: 720px) {
+        .visao-split { grid-template-columns: 1fr 1fr; }
+    }
+    .visao-link-foot { margin-top: 12px; margin-bottom: 0; }
+    .visao-extra .grid-kpi { margin-bottom: 0; }
+</style>
+{% endblock %}
+{% block painel_main %}
+<div id="err" class="err-box"></div>
+<div id="mount" class="visao-mount"></div>
+{% endblock %}
+{% block painel_scripts %}
+<script>
+(function () {
+    const mount = document.getElementById('mount');
+    const err = document.getElementById('err');
+    let chartList = [];
+
+    function showErr(msg) {
+        err.textContent = msg || '';
+        err.classList.toggle('show', !!msg);
+    }
+
+    function destroyCharts() {
+        chartList.forEach(function (ch) {
+            try { ch.destroy(); } catch (e) {}
+        });
+        chartList = [];
+    }
+
+    function fmtDay(iso) {
+        if (!iso || typeof iso !== 'string' || iso.length < 10) return iso || '';
+        var p = iso.slice(0, 10).split('-');
+        if (p.length !== 3) return iso;
+        return p[2] + '/' + p[1];
+    }
+
+    function render(data) {
+        const u = data.users || {};
+        const os = data.orders_summary || {};
+        const s = data.series || {};
+        const labels = s.labels || [];
+        const uSer = s.users_created || [];
+        const oSer = s.orders_created || [];
+        const c = data.customizations || {};
+        const po = c.per_order_averages_all || {};
+        const ep = data.engagement_preview || {};
+        const d = data.window_days || 14;
+        const todayP = (os.created_today_by_status && os.created_today_by_status.pending) || 0;
+        const todayA = (os.created_today_by_status && os.created_today_by_status.approved) || 0;
+        const todayR = (os.created_today_by_status && os.created_today_by_status.rejected) || 0;
+        const sumSeriesU = uSer.reduce(function (a, b) { return a + (b || 0); }, 0);
+        const sumSeriesO = oSer.reduce(function (a, b) { return a + (b || 0); }, 0);
+
+        mount.innerHTML =
+            '<div class="visao-toolbar">' +
+            '<span class="ts">Atualizado: ' + esc((data.generated_at || '').replace('T', ' ').slice(0, 19)) + '</span>' +
+            '<div class="days-row"><label for="days">Período do gráfico</label> ' +
+            '<select id="days" aria-label="Dias no gráfico">' +
+            '<option value="7"' + (d === 7 ? ' selected' : '') + '>7 dias</option>' +
+            '<option value="14"' + (d === 14 ? ' selected' : '') + '>14 dias</option>' +
+            '<option value="30"' + (d === 30 ? ' selected' : '') + '>30 dias</option>' +
+            '</select></div></div>' +
+
+            '<div class="visao-hero">' +
+            '<div class="visao-hero-card visao-hero-card--users">' +
+            '<div class="vh-label">Novos usuários hoje</div>' +
+            '<div class="vh-value">' + esc(String(u.created_today != null ? u.created_today : '—')) + '</div>' +
+            '<div class="vh-hint">' + sumSeriesU + ' novos utilizadores no período do gráfico</div></div>' +
+            '<div class="visao-hero-card visao-hero-card--orders">' +
+            '<div class="vh-label">Pedidos criados hoje</div>' +
+            '<div class="vh-value">' + esc(String(os.created_today != null ? os.created_today : '—')) + '</div>' +
+            '<div class="vh-hint">' + sumSeriesO + ' pedidos novos no período do gráfico</div></div>' +
+            '<div class="visao-hero-card visao-hero-card--ok">' +
+            '<div class="vh-label">Pedidos aprovados (total)</div>' +
+            '<div class="vh-value">' + esc(String(os.approved != null ? os.approved : '—')) + '</div>' +
+            '<div class="vh-hint">Base de sites pagos na plataforma</div></div>' +
+            '<div class="visao-hero-card visao-hero-card--pending">' +
+            '<div class="vh-label">Pedidos pendentes</div>' +
+            '<div class="vh-value">' + esc(String(os.pending != null ? os.pending : '—')) + '</div>' +
+            '<div class="vh-hint">Aguardam pagamento ou revisão</div></div>' +
+            '</div>' +
+
+            '<div class="visao-grid">' +
+            '<section class="painel-section" style="margin-bottom:0">' +
+            '<div class="visao-chart-head">' +
+            '<div><h2>Atividade diária</h2>' +
+            '<p>Linha azul: contas novas por dia. Linha roxa: pedidos criados por dia. Passe o rato sobre os pontos para ver o valor.</p></div></div>' +
+            '<div class="visao-canvas-wrap"><canvas id="visaoChartSeries" role="img" aria-label="Gráfico de utilizadores e pedidos por dia"></canvas></div>' +
+            '</section>' +
+            '<div class="visao-donut-col">' +
+            '<section class="painel-section" style="margin-bottom:0">' +
+            '<div class="visao-mini-title">Pedidos por estado</div>' +
+            '<div class="visao-canvas-wrap visao-canvas-wrap--sm"><canvas id="visaoChartStatus" role="img" aria-label="Distribuição de pedidos por status"></canvas></div>' +
+            '</section>' +
+            '<section class="painel-section" style="margin-bottom:0">' +
+            '<div class="visao-mini-title">Pedidos de hoje</div>' +
+            '<div class="visao-canvas-wrap visao-canvas-wrap--sm"><canvas id="visaoChartToday" role="img" aria-label="Pedidos criados hoje por status"></canvas></div>' +
+            '</section></div></div>' +
+
+            '<section class="painel-section">' +
+            '<div class="visao-chart-head"><div><h2>Médias de conteúdo (todos os pedidos)</h2>' +
+            '<p>Média simples por personalização — inclui pendentes, aprovados e rejeitados. Detalhe do cálculo em <a href="/painel/pedidos/">Pedidos</a>.</p></div></div>' +
+            '<div class="visao-canvas-wrap" style="height:220px"><canvas id="visaoChartContent" role="img" aria-label="Médias de fotos quiz músicas amo e cartinha"></canvas></div>' +
+            '</section>' +
+
+            '<div class="visao-split">' +
+            '<section class="painel-section">' +
+            '<h2 class="section-h" style="margin-top:0">Funil e audiência</h2>' +
+            '<p class="muted">Indicadores operacionais (não são visitas em tempo real ao site do casal).</p>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi"><div class="v">' + (ep.orders_minimal_customization != null ? ep.orders_minimal_customization : '—') + '</div><div class="l">Sem personalizar (estim.)</div></div>' +
+            '<div class="kpi"><div class="v">' + (ep.qr_image_loads_total != null ? ep.qr_image_loads_total : 0) + '</div><div class="l">Carregamentos QR</div></div>' +
+            '<div class="kpi kpi--accent2"><div class="v">' + (ep.instagram_clicks != null ? ep.instagram_clicks : 0) + '</div><div class="l">Cliques Instagram</div></div>' +
+            '<div class="kpi"><div class="v">' + (ep.support_modal_opens != null ? ep.support_modal_opens : 0) + '</div><div class="l">Suporte (modal)</div></div>' +
+            '</div>' +
+            '<p class="muted visao-link-foot"><a href="/painel/audiencia/">Abrir funil e audiência →</a></p>' +
+            '</section>' +
+            '<section class="painel-section visao-extra">' +
+            '<h2 class="section-h" style="margin-top:0">Contas e volume</h2>' +
+            '<p class="muted">Utilizadores ativos (conta sem apagar) e relação com pedidos na plataforma.</p>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi kpi--accent2"><div class="v">' + (u.active_without_orders != null ? u.active_without_orders : '—') + '</div><div class="l">Contas ativas sem nenhum pedido</div></div>' +
+            '<div class="kpi kpi--ok"><div class="v">' + (u.active_with_orders != null ? u.active_with_orders : '—') + '</div><div class="l">Contas ativas com ≥1 pedido</div></div>' +
+            '<div class="kpi"><div class="v">' + (os.total != null ? os.total : '—') + '</div><div class="l">Pedidos (total)</div></div>' +
+            '<div class="kpi"><div class="v">' + (c.total != null ? c.total : '—') + '</div><div class="l">Personalizações</div></div>' +
+            '<div class="kpi"><div class="v">' + (os.rejected != null ? os.rejected : '—') + '</div><div class="l">Pedidos rejeitados</div></div>' +
+            '<div class="kpi"><div class="v">' + (u.staff != null ? u.staff : '—') + '</div><div class="l">Utilizadores staff</div></div>' +
+            '</div></section></div>';
+
+        if (typeof Chart !== 'undefined') {
+            Chart.defaults.color = '#8b949e';
+            Chart.defaults.borderColor = 'rgba(48, 54, 61, 0.55)';
+        }
+
+        var tickLabels = labels.map(fmtDay);
+        var elS = document.getElementById('visaoChartSeries');
+        if (elS && tickLabels.length && typeof Chart !== 'undefined') {
+            chartList.push(new Chart(elS, {
+                type: 'line',
+                data: {
+                    labels: tickLabels,
+                    datasets: [
+                        {
+                            label: 'Novos utilizadores',
+                            data: uSer,
+                            borderColor: '#58a6ff',
+                            backgroundColor: 'rgba(88, 166, 255, 0.12)',
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: labels.length > 20 ? 0 : 3,
+                            pointHoverRadius: 5,
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Novos pedidos',
+                            data: oSer,
+                            borderColor: '#a371f7',
+                            backgroundColor: 'rgba(163, 113, 247, 0.1)',
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: labels.length > 20 ? 0 : 3,
+                            pointHoverRadius: 5,
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { usePointStyle: true, padding: 16, font: { size: 12 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function (items) {
+                                    var i = items.length ? items[0].dataIndex : 0;
+                                    return labels[i] || '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 12 }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 },
+                            grid: { color: 'rgba(48, 54, 61, 0.45)' }
+                        }
+                    }
+                }
+            }));
+        } else if (elS && !tickLabels.length) {
+            elS.parentNode.innerHTML = '<p class="muted" style="margin:0;text-align:center;padding:48px 12px">Sem dados de série para este período.</p>';
+        } else if (elS && tickLabels.length && typeof Chart === 'undefined') {
+            elS.parentNode.innerHTML = '<p class="muted" style="margin:0;text-align:center;padding:48px 12px">Gráfico indisponível (Chart.js não carregou).</p>';
+        }
+
+        var elSt = document.getElementById('visaoChartStatus');
+        var pnd = os.pending != null ? os.pending : 0;
+        var apv = os.approved != null ? os.approved : 0;
+        var rej = os.rejected != null ? os.rejected : 0;
+        if (elSt && (pnd + apv + rej) > 0) {
+            if (typeof Chart !== 'undefined') {
+                chartList.push(new Chart(elSt, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pendentes', 'Aprovados', 'Rejeitados'],
+                    datasets: [{
+                        data: [pnd, apv, rej],
+                        backgroundColor: ['#d29922', '#3fb950', '#f85149'],
+                        borderWidth: 0,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '62%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 11 } } }
+                    }
+                }
+            }));
+            } else {
+                elSt.parentNode.innerHTML = '<p class="muted" style="margin:0;text-align:center;padding:24px 8px">Gráfico indisponível (Chart.js não carregou).</p>';
+            }
+        } else if (elSt) {
+            elSt.parentNode.innerHTML = '<p class="muted" style="margin:0;text-align:center;padding:24px 8px">Ainda não há pedidos na base.</p>';
+        }
+
+        var elTd = document.getElementById('visaoChartToday');
+        if (elTd && (todayP + todayA + todayR) > 0) {
+            if (typeof Chart !== 'undefined') {
+                chartList.push(new Chart(elTd, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pendentes', 'Aprovados', 'Rejeitados'],
+                    datasets: [{
+                        data: [todayP, todayA, todayR],
+                        backgroundColor: ['#d29922', '#3fb950', '#f85149'],
+                        borderWidth: 0,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '62%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 11 } } }
+                    }
+                }
+            }));
+            } else {
+                elTd.parentNode.innerHTML = '<p class="muted" style="margin:0;text-align:center;padding:24px 8px">Gráfico indisponível (Chart.js não carregou).</p>';
+            }
+        } else if (elTd) {
+            elTd.parentNode.innerHTML = '<p class="muted" style="margin:0;text-align:center;padding:24px 8px">Nenhum pedido criado hoje.</p>';
+        }
+
+        var elC = document.getElementById('visaoChartContent');
+        var pv = po.photos_polaroids != null ? Number(po.photos_polaroids) : 0;
+        var qv = po.quiz_questions != null ? Number(po.quiz_questions) : 0;
+        var mv = po.music_unique_tracks != null ? Number(po.music_unique_tracks) : 0;
+        var av = po.amo_messages != null ? Number(po.amo_messages) : 0;
+        var cv = po.cartinha_units != null ? Number(po.cartinha_units) : 0;
+        if (elC) {
+            if (typeof Chart !== 'undefined') {
+                chartList.push(new Chart(elC, {
+                type: 'bar',
+                data: {
+                    labels: ['Fotos (polaroids)', 'Perguntas quiz', 'Músicas (faixas)', 'Mensagens Amo', 'Cartinha (unid.)'],
+                    datasets: [{
+                        label: 'Média por site',
+                        data: [pv, qv, mv, av, cv],
+                        backgroundColor: [
+                            'rgba(88, 166, 255, 0.75)',
+                            'rgba(163, 113, 247, 0.75)',
+                            'rgba(63, 185, 80, 0.7)',
+                            'rgba(210, 153, 34, 0.75)',
+                            'rgba(244, 143, 177, 0.75)'
+                        ],
+                        borderRadius: 6,
+                        borderSkipped: false
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    return ' Média: ' + fmtNum(ctx.raw, 2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(48, 54, 61, 0.45)' },
+                            ticks: {
+                                callback: function (val) {
+                                    var n = Number(val);
+                                    if (Number.isNaN(n)) return val;
+                                    return Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : n.toFixed(1);
+                                }
+                            }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { font: { size: 11 } }
+                        }
+                    }
+                }
+            }));
+            } else {
+                elC.parentNode.innerHTML = '<p class="muted" style="margin:0;text-align:center;padding:48px 12px">Gráfico indisponível (Chart.js não carregou).</p>';
+            }
+        }
+    }
+
+    mount.addEventListener('change', function (e) {
+        if (e.target && e.target.id === 'days') load();
+    });
+
+    async function load() {
+        showErr('');
+        var prev = document.getElementById('days');
+        var d = prev ? parseInt(prev.value, 10) || 14 : 14;
+        var res = await painelFetch('/painel/dashboard?page=visao&days=' + d);
+        if (!res.ok) {
+            var j = await res.json().catch(function () { return {}; });
+            showErr(j.detail || 'Não foi possível carregar.');
+            return;
+        }
+        var data = await res.json();
+        destroyCharts();
+        render(data);
+        if (typeof Chart === 'undefined') {
+            showErr('Não foi possível carregar a biblioteca de gráficos (Chart.js). Verifique a ligação à Internet ou bloqueio de CDN.');
+        } else {
+            showErr('');
+        }
+    }
+
+    load();
+})();
+</script>
+{% endblock %}

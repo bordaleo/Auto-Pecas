@@ -1,0 +1,63 @@
+{% extends "admin/painel_base.html" %}
+{% block painel_title %}Funil e audiência{% endblock %}
+{% block painel_head_extra %}
+<style>
+    @media (min-width: 1100px) {
+        .audiencia-stack { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
+    }
+</style>
+{% endblock %}
+{% block painel_main %}
+<div id="err" class="err-box"></div>
+<div id="mount"></div>
+{% endblock %}
+{% block painel_scripts %}
+<script>
+(function () {
+    const mount = document.getElementById('mount');
+    const err = document.getElementById('err');
+    function showErr(m) { err.textContent = m || ''; err.classList.toggle('show', !!m); }
+    async function load() {
+        showErr('');
+        const res = await painelFetch('/painel/dashboard?page=audiencia&days=14');
+        if (!res.ok) { const j = await res.json().catch(function(){return{};}); showErr(j.detail || 'Erro'); return; }
+        const data = await res.json();
+        const f = data.funnel || {};
+        const e = data.engagement || {};
+        const s = e.site || {};
+        const q = e.qr || {};
+        mount.innerHTML =
+            '<p class="painel-meta"><span class="ts">Atualizado: ' + esc((data.generated_at || '').replace('T',' ').slice(0,19)) + '</span></p>' +
+            '<div class="painel-callout" style="margin-bottom:16px">Estes valores <strong>não</strong> são visitas em tempo real ao site do casal: vêm de contadores gravados na base (QR, cliques no modal) e são calculados ao carregar o painel.</div>' +
+            '<div class="audiencia-stack">' +
+            '<section class="painel-section" style="margin-bottom:16px">' +
+            '<h2 class="section-h" style="margin-top:0">Funil de personalização</h2>' +
+            '<p class="muted">' + esc(f.definition_minimal || '') + '</p>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi"><div class="v">' + (f.orders_minimal_customization != null ? f.orders_minimal_customization : '—') + '</div><div class="l">Nome padrão + sem fotos + sem músicas</div></div>' +
+            '<div class="kpi kpi--accent2"><div class="v">' + (f.orders_still_default_title != null ? f.orders_still_default_title : '—') + '</div><div class="l">Só nome ainda no padrão</div></div>' +
+            '<div class="kpi"><div class="v">' + (f.approved_without_public_slug != null ? f.approved_without_public_slug : '—') + '</div><div class="l">Aprovados sem slug público</div></div>' +
+            '</div>' +
+            '<p class="muted" style="margin-bottom:0">' + esc(f.definition_default_title || '') + '</p></section>' +
+            '<section class="painel-section" style="margin-bottom:16px">' +
+            '<h2 class="section-h" style="margin-top:0">QR Code</h2>' +
+            '<p class="muted">' + esc(q.note || '') + '</p>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi"><div class="v">' + (q.image_loads_total != null ? q.image_loads_total : 0) + '</div><div class="l">Carregamentos imagem</div></div>' +
+            '<div class="kpi kpi--accent2"><div class="v">' + (q.download_total != null ? q.download_total : 0) + '</div><div class="l">Downloads</div></div>' +
+            '<div class="kpi kpi--ok"><div class="v">' + (q.orders_with_any_qr_activity != null ? q.orders_with_any_qr_activity : 0) + '</div><div class="l">Pedidos com atividade QR</div></div>' +
+            '</div></section>' +
+            '<section class="painel-section" style="margin-bottom:16px">' +
+            '<h2 class="section-h" style="margin-top:0">Landing e suporte</h2>' +
+            '<p class="muted">Beacon ao abrir suporte ou clicar em links do modal.</p>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi"><div class="v">' + (s.instagram_clicks != null ? s.instagram_clicks : 0) + '</div><div class="l">Cliques Instagram</div></div>' +
+            '<div class="kpi kpi--accent2"><div class="v">' + (s.tiktok_clicks != null ? s.tiktok_clicks : 0) + '</div><div class="l">Cliques TikTok</div></div>' +
+            '<div class="kpi kpi--ok"><div class="v">' + (s.support_modal_opens != null ? s.support_modal_opens : 0) + '</div><div class="l">Aberturas suporte</div></div>' +
+            '</div></section></div>' +
+            '<p class="muted"><a href="/painel/visao/">← Visão geral</a> · <a href="/painel/pedidos/">Pedidos</a></p>';
+    }
+    load();
+})();
+</script>
+{% endblock %}

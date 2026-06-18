@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrar — AutoPeças Sandroni</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #e8e8e8;
+            padding: 20px;
+        }
+        .card {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 16px;
+            padding: 32px 28px;
+            backdrop-filter: blur(8px);
+        }
+        h1 { font-size: 1.35rem; margin-bottom: 8px; }
+        p.sub { font-size: 0.9rem; opacity: 0.75; margin-bottom: 24px; }
+        label { display: block; font-size: 0.85rem; margin-bottom: 8px; }
+        input[type="password"] {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.25);
+            color: #fff;
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+        input[type="password"]::placeholder { color: #888; }
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: linear-gradient(135deg, #e94560, #c73e54);
+            color: #fff;
+        }
+        button:hover { filter: brightness(1.05); }
+        .err {
+            background: rgba(233, 69, 96, 0.2);
+            border: 1px solid rgba(233, 69, 96, 0.5);
+            color: #ffb4c0;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Painel operacional</h1>
+        <p class="sub">Digite a senha para continuar. Não é necessário estar logado no site.</p>
+        {% if error %}<div class="err">{{ error }}</div>{% endif %}
+        <form method="post" action="/painel/entrar/">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+            <label for="pw">Senha</label>
+            <input id="pw" type="password" name="password" autocomplete="current-password" required autofocus>
+            <button type="submit">Entrar</button>
+        </form>
+    </div>
+</body>
+</html>

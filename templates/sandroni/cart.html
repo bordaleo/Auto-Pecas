@@ -1,0 +1,15 @@
+{% extends "sandroni/base.html" %}
+{% block title %}Carrinho — AutoPeças Sandroni{% endblock %}
+
+{% block content %}
+<div class="page-banner">
+    <div class="wrap"><h1>Seu carrinho</h1></div>
+</div>
+<section class="section">
+    <div class="wrap"><div id="cart-page" class="panel"></div></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>document.addEventListener('DOMContentLoaded', () => Sandroni.renderCartPage());</script>
+{% endblock %}

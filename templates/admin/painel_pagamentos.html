@@ -1,0 +1,63 @@
+{% extends "admin/painel_base.html" %}
+{% block painel_title %}Pagamentos{% endblock %}
+{% block painel_head_extra %}
+<style>
+    .pay-hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .pay-hero .ph { background: linear-gradient(145deg, #1c2128, #161b22); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+    .pay-hero .ph .v { font-size: 1.65rem; font-weight: 750; color: var(--ok); font-variant-numeric: tabular-nums; }
+    .pay-hero .ph .l { font-size: 0.75rem; color: var(--muted); margin-top: 8px; }
+    .pay-hero .ph--muted .v { color: var(--accent); }
+</style>
+{% endblock %}
+{% block painel_main %}
+<div id="err" class="err-box"></div>
+<div id="mount"></div>
+{% endblock %}
+{% block painel_scripts %}
+<script>
+(function () {
+    const mount = document.getElementById('mount');
+    const err = document.getElementById('err');
+    function showErr(m) { err.textContent = m || ''; err.classList.toggle('show', !!m); }
+    async function load() {
+        showErr('');
+        const res = await painelFetch('/painel/dashboard?page=pagamentos&days=14');
+        if (!res.ok) { const j = await res.json().catch(function(){return{};}); showErr(j.detail || 'Erro'); return; }
+        const data = await res.json();
+        const o = data.orders || {};
+        const pay = o.payment_methods_approved || [];
+        let pr = '';
+        pay.forEach(function (r) { pr += '<tr><td>' + esc(r.method) + '</td><td>' + r.count + '</td></tr>'; });
+        const plans = o.plans || {};
+        let pl = '';
+        Object.keys(plans).forEach(function (k) {
+            const p = plans[k];
+            pl += '<tr><td>' + esc(k) + '</td><td>' + p.total + '</td><td>' + p.approved + '</td></tr>';
+        });
+        mount.innerHTML =
+            '<p class="painel-meta"><span class="ts">Atualizado: ' + esc((data.generated_at || '').replace('T',' ').slice(0,19)) + '</span></p>' +
+
+            '<div class="pay-hero">' +
+            '<div class="ph"><div class="v">' + brl(o.revenue_approved_sum) + '</div><div class="l">Receita acumulada (pedidos aprovados)</div></div>' +
+            '<div class="ph ph--muted"><div class="v">' + (o.approved_count || 0) + '</div><div class="l">Pedidos aprovados (quantidade)</div></div>' +
+            '<div class="ph ph--muted"><div class="v">' + (o.pending != null ? o.pending : '—') + '</div><div class="l">Pendentes (ainda não aprovados)</div></div>' +
+            '</div>' +
+
+            '<section class="painel-section">' +
+            '<h2 class="section-h">Métodos de pagamento</h2>' +
+            '<p class="muted">Distribuição entre pedidos com estado <strong>aprovado</strong>.</p>' +
+            '<table class="data"><thead><tr><th>Método</th><th>Quantidade</th></tr></thead><tbody>' +
+            (pr || '<tr><td colspan="2">Sem dados</td></tr>') + '</tbody></table></section>' +
+
+            '<section class="painel-section">' +
+            '<h2 class="section-h">Planos</h2>' +
+            '<p class="muted">Total de pedidos criados vs. aprovados por tipo de plano.</p>' +
+            '<table class="data"><thead><tr><th>Plano</th><th>Total</th><th>Aprovados</th></tr></thead><tbody>' +
+            (pl || '<tr><td colspan="3">Sem dados</td></tr>') + '</tbody></table></section>' +
+
+            '<p class="muted" style="margin-top:4px"><a href="/painel/pedidos/">← Voltar a Pedidos</a> · <a href="/painel/visao/">Visão geral</a></p>';
+    }
+    load();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "sandroni/base.html" %}
+{% block title %}Checkout — AutoPeças Sandroni{% endblock %}
+
+{% block content %}
+<div class="page-banner">
+    <div class="wrap"><h1>Finalizar compra</h1><p>Pagamento seguro via Mercado Pago</p></div>
+</div>
+<section class="section">
+    <div class="wrap" id="checkout-page"><p class="loading">Preparando checkout...</p></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>document.addEventListener('DOMContentLoaded', () => Sandroni.initCheckout());</script>
+{% endblock %}

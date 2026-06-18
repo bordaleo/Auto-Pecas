@@ -1,0 +1,91 @@
+{% extends "admin/painel_base.html" %}
+{% block painel_title %}Conteúdo{% endblock %}
+{% block painel_head_extra %}
+<style>
+    .conteudo-split { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 960px) { .conteudo-split { grid-template-columns: 1fr 1fr; } }
+</style>
+{% endblock %}
+{% block painel_main %}
+<div id="err" class="err-box"></div>
+<div id="mount"></div>
+{% endblock %}
+{% block painel_scripts %}
+<script>
+(function () {
+    const mount = document.getElementById('mount');
+    const err = document.getElementById('err');
+    function showErr(m) { err.textContent = m || ''; err.classList.toggle('show', !!m); }
+    async function load() {
+        showErr('');
+        const res = await painelFetch('/painel/dashboard?page=conteudo&days=14');
+        if (!res.ok) { const j = await res.json().catch(function(){return{};}); showErr(j.detail || 'Erro'); return; }
+        const data = await res.json();
+        const c = data.customizations || {};
+        const po = c.per_order_averages_all || {};
+        const poAp = c.per_order_averages_approved || {};
+        const top = data.top_music_youtube || [];
+        const sug = data.suggestion_adoption || {};
+        const sp = sug.percent_of_customizations || {};
+        let tr = '';
+        top.forEach(function (row, idx) {
+            tr += '<tr><td>' + (idx+1) + '</td><td><a href="' + esc(row.url) + '" target="_blank" rel="noopener">' + esc(row.label) + '</a></td><td>' + row.count + '</td><td>' +
+                (row.from_editor_suggestions ? '<span class="badge">Sugestão</span>' : '') + '</td></tr>';
+        });
+        mount.innerHTML =
+            '<p class="painel-meta"><span class="ts">Atualizado: ' + esc((data.generated_at || '').replace('T',' ').slice(0,19)) + '</span></p>' +
+
+            '<section class="painel-section">' +
+            '<h2 class="section-h">Médias de preenchimento</h2>' +
+            '<div class="painel-callout">' +
+            '<strong>Todos os pedidos:</strong> média = soma das quantidades ÷ número de personalizações (pendentes + aprovados + rejeitados). ' +
+            '<strong>Média de fotos (todos):</strong> <strong>' + fmtNum(c.avg_polaroids_all, 2) + '</strong> polaroids por pedido. ' +
+            'Só aprovados (referência): <strong>' + fmtNum(c.avg_polaroids_approved, 2) + '</strong>.' +
+            '</div>' +
+            '<div class="conteudo-split">' +
+            '<div><p class="muted" style="margin-top:0"><strong>Base ' + (po.orders_count || 0) + ' personalizações</strong> — todos os estados</p>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi"><div class="v">' + fmtNum(po.photos_polaroids, 2) + '</div><div class="l">Fotos</div></div>' +
+            '<div class="kpi"><div class="v">' + fmtNum(po.quiz_questions, 2) + '</div><div class="l">Quiz</div></div>' +
+            '<div class="kpi kpi--accent2"><div class="v">' + fmtNum(po.music_unique_tracks, 2) + '</div><div class="l">Músicas</div></div>' +
+            '<div class="kpi kpi--ok"><div class="v">' + fmtNum(po.amo_messages, 2) + '</div><div class="l">Amo</div></div>' +
+            '<div class="kpi"><div class="v">' + fmtNum(po.cartinha_units, 2) + '</div><div class="l">Cartinha</div></div>' +
+            '</div></div>' +
+            '<div><p class="muted" style="margin-top:0"><strong>Base ' + (poAp.orders_count || 0) + '</strong> — só aprovados</p>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi"><div class="v">' + fmtNum(poAp.photos_polaroids, 2) + '</div><div class="l">Fotos</div></div>' +
+            '<div class="kpi"><div class="v">' + fmtNum(poAp.quiz_questions, 2) + '</div><div class="l">Quiz</div></div>' +
+            '<div class="kpi kpi--accent2"><div class="v">' + fmtNum(poAp.music_unique_tracks, 2) + '</div><div class="l">Músicas</div></div>' +
+            '<div class="kpi kpi--ok"><div class="v">' + fmtNum(poAp.amo_messages, 2) + '</div><div class="l">Amo</div></div>' +
+            '<div class="kpi"><div class="v">' + fmtNum(poAp.cartinha_units, 2) + '</div><div class="l">Cartinha</div></div>' +
+            '</div></div></div>' +
+            '</section>' +
+
+            '<section class="painel-section">' +
+            '<h2 class="section-h">Volume de personalizações</h2>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi"><div class="v">' + (c.total || 0) + '</div><div class="l">Personalizações na base</div></div>' +
+            '<div class="kpi kpi--ok"><div class="v">' + (c.with_quiz_score || 0) + '</div><div class="l">Com pontuação de quiz registada</div></div>' +
+            '</div></section>' +
+
+            '<section class="painel-section">' +
+            '<h2 class="section-h">Faixas mais usadas (YouTube)</h2>' +
+            '<p class="muted">Só pedidos <strong>aprovados</strong>. Cada faixa conta no máximo uma vez por site.</p>' +
+            '<table class="data"><thead><tr><th>#</th><th>Faixa</th><th>Sites</th><th></th></tr></thead><tbody>' +
+            (tr || '<tr><td colspan="4">Nenhuma</td></tr>') + '</tbody></table></section>' +
+
+            '<section class="painel-section">' +
+            '<h2 class="section-h">Sugestões do editor (estimativa)</h2>' +
+            '<p class="muted">' + esc(sug.note || '') + '</p>' +
+            '<div class="grid-kpi">' +
+            '<div class="kpi"><div class="v">' + (sp.amo || 0) + '%</div><div class="l">Amo</div></div>' +
+            '<div class="kpi"><div class="v">' + (sp.quiz || 0) + '%</div><div class="l">Quiz</div></div>' +
+            '<div class="kpi kpi--accent2"><div class="v">' + (sp.song || 0) + '%</div><div class="l">Música</div></div>' +
+            '<div class="kpi"><div class="v">' + (sp.cartinha || 0) + '%</div><div class="l">Cartinha</div></div>' +
+            '<div class="kpi kpi--ok"><div class="v">' + (sp.any || 0) + '%</div><div class="l">Qualquer</div></div>' +
+            '</div></section>';
+    }
+    load();
+})();
+</script>
+{% endblock %}

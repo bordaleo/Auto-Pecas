@@ -1,0 +1,270 @@
+{% extends "sandroni/base.html" %}
+{% block title %}AutoPeças Sandroni — Peças automotivas com qualidade{% endblock %}
+
+{% block content %}
+<!-- Carrossel promocional -->
+<section class="promo-carousel" id="promo-carousel" aria-label="Ofertas em destaque">
+    <div class="promo-carousel-shell wrap">
+        <button type="button" class="promo-nav promo-nav--prev" id="promo-prev" aria-label="Slide anterior">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+
+        <div class="promo-viewport">
+            <div class="promo-track" id="promo-track">
+                <article class="promo-slide promo-slide--green">
+                    <div class="promo-slide-inner">
+                        <div class="promo-slide-content">
+                            <span class="promo-badge">Caminhão e Caminhonete</span>
+                            <h2 class="promo-title">Seleção de Ofertas<br><em>é na Sandroni</em></h2>
+                            <p class="promo-offer">
+                                <span class="promo-offer-tag">Até</span>
+                                <span class="promo-offer-big">60% OFF</span>
+                                <span class="promo-offer-text">em Motor, Filtros e Elétrica</span>
+                            </p>
+                            <a href="/pecas/?featured=1" class="promo-cta">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                                Ver ofertas agora
+                            </a>
+                        </div>
+                        <div class="promo-slide-visual" aria-hidden="true">
+                            <div class="promo-panel promo-panel--yellow">
+                                <div class="promo-parts-grid">
+                                    <span class="promo-part">🔩</span>
+                                    <span class="promo-part">🛑</span>
+                                    <span class="promo-part">🌬</span>
+                                    <span class="promo-part">⚡</span>
+                                    <span class="promo-part promo-part--lg">🔧</span>
+                                    <span class="promo-part">🛢</span>
+                                </div>
+                                <div class="promo-seals-col">
+                                    <div class="promo-seal">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                        As melhores marcas
+                                    </div>
+                                    <a href="/pecas/" class="promo-seal promo-seal--cta">Garanta &gt;</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="promo-slide promo-slide--navy">
+                    <div class="promo-slide-inner">
+                        <div class="promo-slide-content">
+                            <span class="promo-badge">Frete grátis*</span>
+                            <h2 class="promo-title">Peças originais<br><em>e paralelas</em></h2>
+                            <p class="promo-desc">Estoque real, pagamento seguro via Mercado Pago e entrega para todo o Brasil</p>
+                            <a href="/pecas/" class="promo-cta">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                                Explorar catálogo
+                            </a>
+                        </div>
+                        <div class="promo-slide-visual" aria-hidden="true">
+                            <div class="promo-stats-card">
+                                <div class="promo-stat-item">
+                                    <span class="promo-stat-icon">📦</span>
+                                    <div><strong id="stat-products">—</strong><span>Peças no catálogo</span></div>
+                                </div>
+                                <div class="promo-stat-item">
+                                    <span class="promo-stat-icon">💳</span>
+                                    <div><strong>PIX · Cartão</strong><span>Pagamento seguro</span></div>
+                                </div>
+                                <div class="promo-stat-item">
+                                    <span class="promo-stat-icon">🚚</span>
+                                    <div><strong>Entrega</strong><span>Todo o Brasil</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="promo-slide promo-slide--orange">
+                    <div class="promo-slide-inner">
+                        <div class="promo-slide-content">
+                            <span class="promo-badge">Tradição desde 1984</span>
+                            <h2 class="promo-title">+40 anos<br><em>de confiança</em></h2>
+                            <p class="promo-desc">Há mais de 40 anos no mercado exercendo os melhores serviços no seu veículo</p>
+                            <a href="/pecas/" class="promo-cta promo-cta--dark">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                                Encontrar minha peça
+                            </a>
+                        </div>
+                        <div class="promo-slide-visual" aria-hidden="true">
+                            <div class="promo-heritage-icon">
+                                <span>40+</span>
+                                <small>anos</small>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+            <div class="promo-progress" id="promo-progress" aria-hidden="true"><span></span></div>
+        </div>
+
+        <button type="button" class="promo-nav promo-nav--next" id="promo-next" aria-label="Próximo slide">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+
+        <div class="promo-dots" id="promo-dots" role="tablist" aria-label="Navegação do carrossel"></div>
+    </div>
+</section>
+
+<!-- Busca rápida -->
+<section class="hero-search-bar">
+    <div class="wrap">
+        <form class="hero-search" action="/pecas/" method="get" role="search">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="search" name="q" placeholder="Busque por nome, código OEM, marca ou veículo compatível...">
+            <button type="submit">Buscar peças</button>
+        </form>
+        <div class="quick-cats" id="quick-cats"></div>
+    </div>
+</section>
+
+<!-- Faixa de marcas de veículos -->
+<section class="brand-marquee-section" aria-label="Marcas de veículos atendidas">
+    <div class="wrap brand-marquee-head">
+        <span class="brand-marquee-label">Peças para todas as marcas</span>
+        <span class="brand-marquee-hint">Clique para filtrar por veículo</span>
+    </div>
+    <div class="brand-marquee-wrap">
+        <div class="brand-marquee-track brand-marquee-track--fwd" id="brand-marquee-track"></div>
+    </div>
+    <div class="brand-marquee-wrap brand-marquee-wrap--rev">
+        <div class="brand-marquee-track brand-marquee-track--rev" id="brand-marquee-track-rev"></div>
+    </div>
+</section>
+
+<section class="trust-bar">
+    <div class="wrap trust-bar-inner">
+        <div class="trust-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Compra segura
+        </div>
+        <div class="trust-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/></svg>
+            Entrega rápida
+        </div>
+        <div class="trust-item trust-item--highlight">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            +40 anos de experiência
+        </div>
+        <div class="trust-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Estoque verificado
+        </div>
+        <div class="trust-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Suporte dedicado
+        </div>
+    </div>
+</section>
+
+<!-- Sobre nós -->
+<section class="heritage-section">
+    <div class="heritage-bg" aria-hidden="true"></div>
+    <div class="wrap heritage-grid">
+        <div class="heritage-visual">
+            <div class="heritage-logo-wrap">{% include "sandroni/includes/logo_icon.html" %}</div>
+            <div class="heritage-badge">Desde 1984</div>
+            <div class="heritage-number">40<span>+</span></div>
+            <p class="heritage-years">anos de tradição</p>
+        </div>
+        <div class="heritage-content">
+            <span class="heritage-eyebrow">AutoPeças Sandroni</span>
+            <h2>Tradição que você pode confiar</h2>
+            <p class="heritage-lead">Há mais de <strong>40 anos no mercado</strong> exercendo os melhores serviços no seu veículo.</p>
+            <p>A AutoPeças Sandroni nasceu da paixão por automóveis e do compromisso em oferecer peças de qualidade com atendimento humano. Somos referência em autopeças com estoque real, preços justos e equipe especializada.</p>
+            <div class="heritage-features">
+                <div class="heritage-feature">
+                    <div class="heritage-feature-icon">🔩</div>
+                    <div><strong>Peças certificadas</strong><span>Marcas originais e paralelas de confiança</span></div>
+                </div>
+                <div class="heritage-feature">
+                    <div class="heritage-feature-icon">👨‍🔧</div>
+                    <div><strong>Atendimento especializado</strong><span>Equipe pronta para orientar sua compra</span></div>
+                </div>
+                <div class="heritage-feature">
+                    <div class="heritage-feature-icon">📍</div>
+                    <div><strong>Retirada na loja</strong><span>Rua São Sabino, 262</span></div>
+                </div>
+            </div>
+            <div class="heritage-actions">
+                <a href="/pecas/" class="btn btn-primary">Ver catálogo completo</a>
+                <a href="/whatsapp/" class="btn btn-whatsapp" id="heritage-whatsapp" target="_blank" rel="noopener">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.435 9.884-9.881 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+                    Chamar no WhatsApp
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Como comprar -->
+<section class="steps-section">
+    <div class="wrap">
+        <div class="section-head section-head--center">
+            <h2>Como comprar</h2>
+            <p>Simples, rápido e seguro — em 3 passos</p>
+        </div>
+        <div class="steps-grid">
+            <div class="step-card">
+                <span class="step-num">1</span>
+                <h3>Busque sua peça</h3>
+                <p>Pesquise por nome, código OEM, marca do veículo ou categoria. Filtre por compatibilidade.</p>
+            </div>
+            <div class="step-card">
+                <span class="step-num">2</span>
+                <h3>Adicione ao carrinho</h3>
+                <p>Confira preço, estoque e compatibilidade. Escolha a quantidade e finalize quando quiser.</p>
+            </div>
+            <div class="step-card">
+                <span class="step-num">3</span>
+                <h3>Pague com segurança</h3>
+                <p>PIX, cartão ou boleto via Mercado Pago. Retire na loja ou receba em casa.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section section-categories">
+    <div class="wrap">
+        <div class="section-head">
+            <h2>Categorias</h2>
+            <a href="/pecas/">Ver catálogo completo →</a>
+        </div>
+        <div class="cat-grid" id="home-categories"></div>
+    </div>
+</section>
+
+<section class="section section-featured">
+    <div class="wrap">
+        <div class="section-head">
+            <h2>Destaques</h2>
+            <a href="/pecas/?featured=1">Ver todos →</a>
+        </div>
+        <div class="product-grid" id="home-featured"></div>
+    </div>
+</section>
+
+<!-- CTA ajuda -->
+<section class="cta-strip">
+    <div class="wrap cta-strip-inner">
+        <div>
+            <h3>Não encontrou a peça?</h3>
+            <p>Nossa equipe com mais de 40 anos de experiência pode ajudar você a localizar o item certo.</p>
+        </div>
+        <div class="cta-strip-actions">
+            <a href="/pecas/" class="btn btn-primary">Buscar no catálogo</a>
+            <a href="/whatsapp/" class="btn btn-whatsapp" id="cta-whatsapp" target="_blank" rel="noopener">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.435 9.884-9.881 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+                WhatsApp
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>document.addEventListener('DOMContentLoaded', () => { Sandroni.loadHome(); Sandroni.handleAuthUrlParams(); });</script>
+{% endblock %}

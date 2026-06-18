@@ -1,0 +1,218 @@
+{% extends "admin/painel_base.html" %}
+{% block painel_title %}Configurações{% endblock %}
+{% block painel_head_extra %}
+<style>
+    .cfg-wrap { max-width: 720px; }
+    .cfg-section {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 14px;
+    }
+    .cfg-section h2 { font-size: 1rem; margin-bottom: 14px; color: #fff; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .cfg-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+    }
+    .cfg-row:last-child { border-bottom: none; }
+    .cfg-row label { font-weight: 500; font-size: 0.875rem; flex: 1; min-width: 160px; }
+    .toggle {
+        position: relative;
+        width: 48px;
+        height: 26px;
+        background: #30363d;
+        border-radius: 13px;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle::after {
+        content: '';
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        background: #fff;
+        border-radius: 50%;
+        top: 3px;
+        left: 3px;
+        transition: left 0.2s;
+    }
+    .toggle.on::after { left: 25px; }
+    .cfg-row input[type="number"] {
+        width: 88px;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #0d1117;
+        color: var(--text);
+        text-align: center;
+    }
+    .cfg-row textarea {
+        width: 100%;
+        min-height: 88px;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #0d1117;
+        color: var(--text);
+        font: inherit;
+        margin-top: 8px;
+    }
+    .save-btn {
+        width: 100%;
+        max-width: 720px;
+        padding: 14px;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        background: linear-gradient(135deg, #238636, #2ea043);
+        color: #fff;
+    }
+    .save-btn:hover { filter: brightness(1.06); }
+    #cfgAlert { display: none; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 0.875rem; }
+    #cfgAlert.ok { display: block; background: rgba(46,160,67,0.15); border: 1px solid rgba(46,160,67,0.4); color: #7ee787; }
+    #cfgAlert.bad { display: block; background: rgba(248,81,73,0.12); border: 1px solid rgba(248,81,73,0.35); color: #ffb4b0; }
+    #cfgLoad { display: none; font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; }
+</style>
+{% endblock %}
+{% block painel_main %}
+<div class="cfg-wrap">
+    <div id="cfgAlert"></div>
+    <div id="cfgLoad">A carregar…</div>
+    <div id="err" class="err-box"></div>
+    <form id="configForm">
+        <div class="cfg-section">
+            <h2>Funcionalidades</h2>
+            <div class="cfg-row">
+                <label>Habilitar Músicas</label>
+                <div class="toggle {% if config.enable_music %}on{% endif %}" data-field="enable_music"><input type="checkbox" name="enable_music" {% if config.enable_music %}checked{% endif %} style="display:none"></div>
+            </div>
+            <div class="cfg-row">
+                <label>Habilitar Quiz</label>
+                <div class="toggle {% if config.enable_quiz %}on{% endif %}" data-field="enable_quiz"><input type="checkbox" name="enable_quiz" {% if config.enable_quiz %}checked{% endif %} style="display:none"></div>
+            </div>
+            <div class="cfg-row">
+                <label>Habilitar Fotos (Polaroids)</label>
+                <div class="toggle {% if config.enable_polaroids %}on{% endif %}" data-field="enable_polaroids"><input type="checkbox" name="enable_polaroids" {% if config.enable_polaroids %}checked{% endif %} style="display:none"></div>
+            </div>
+            <div class="cfg-row">
+                <label>Habilitar Lista Amo</label>
+                <div class="toggle {% if config.enable_amo_list %}on{% endif %}" data-field="enable_amo_list"><input type="checkbox" name="enable_amo_list" {% if config.enable_amo_list %}checked{% endif %} style="display:none"></div>
+            </div>
+            <div class="cfg-row">
+                <label>Habilitar Cartinha</label>
+                <div class="toggle {% if config.enable_custom_messages %}on{% endif %}" data-field="enable_custom_messages"><input type="checkbox" name="enable_custom_messages" {% if config.enable_custom_messages %}checked{% endif %} style="display:none"></div>
+            </div>
+        </div>
+        <div class="cfg-section">
+            <h2>Limites</h2>
+            <div class="cfg-row">
+                <label>Máximo de Fotos</label>
+                <input type="number" name="max_polaroids" min="1" max="20" value="{{ config.max_polaroids }}">
+            </div>
+            <div class="cfg-row">
+                <label>Máximo de Músicas</label>
+                <input type="number" name="max_music_songs" min="1" max="10" value="{{ config.max_music_songs }}">
+            </div>
+            <div class="cfg-row">
+                <label>Máximo de Mensagens Amo</label>
+                <input type="number" name="max_amo_messages" min="1" max="100" value="{{ config.max_amo_messages }}">
+            </div>
+        </div>
+        <div class="cfg-section">
+            <h2>Manutenção</h2>
+            <div class="cfg-row">
+                <label>Modo Manutenção</label>
+                <div class="toggle {% if config.maintenance_mode %}on{% endif %}" data-field="maintenance_mode"><input type="checkbox" name="maintenance_mode" {% if config.maintenance_mode %}checked{% endif %} style="display:none"></div>
+            </div>
+            <div class="cfg-row" style="flex-direction:column;align-items:stretch">
+                <label>Mensagem de Manutenção</label>
+                <textarea name="maintenance_message" placeholder="Mensagem exibida em manutenção…">{{ config.maintenance_message|default:'' }}</textarea>
+            </div>
+        </div>
+        <button type="submit" class="save-btn">Guardar configurações</button>
+    </form>
+</div>
+{% endblock %}
+{% block painel_scripts %}
+<script>
+(function () {
+    const form = document.getElementById('configForm');
+    const err = document.getElementById('err');
+    const cfgAlert = document.getElementById('cfgAlert');
+    const cfgLoad = document.getElementById('cfgLoad');
+
+    function showErr(m) { err.textContent = m || ''; err.classList.toggle('show', !!m); }
+    function showOk(msg) {
+        cfgAlert.className = 'ok';
+        cfgAlert.textContent = msg;
+        cfgAlert.style.display = 'block';
+    }
+    function showBad(msg) {
+        cfgAlert.className = 'bad';
+        cfgAlert.textContent = msg;
+        cfgAlert.style.display = 'block';
+    }
+
+    document.querySelectorAll('.toggle').forEach(function (t) {
+        t.addEventListener('click', function () {
+            const cb = t.querySelector('input[type="checkbox"]');
+            cb.checked = !cb.checked;
+            t.classList.toggle('on', cb.checked);
+        });
+    });
+
+    async function loadCfg() {
+        showErr('');
+        cfgLoad.style.display = 'block';
+        const res = await painelFetch('/admin/system-config');
+        cfgLoad.style.display = 'none';
+        if (!res.ok) { showErr('Não autorizado ou erro ao carregar.'); return; }
+        const c = await res.json();
+        ['enable_music','enable_quiz','enable_polaroids','enable_amo_list','enable_custom_messages','maintenance_mode'].forEach(function (k) {
+            const cb = document.querySelector('[name="' + k + '"]');
+            if (cb) { cb.checked = !!c[k]; cb.closest('.toggle').classList.toggle('on', cb.checked); }
+        });
+        document.querySelector('[name="max_polaroids"]').value = c.max_polaroids;
+        document.querySelector('[name="max_music_songs"]').value = c.max_music_songs;
+        document.querySelector('[name="max_amo_messages"]').value = c.max_amo_messages;
+        document.querySelector('[name="maintenance_message"]').value = c.maintenance_message || '';
+    }
+
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        cfgAlert.style.display = 'none';
+        const data = {
+            enable_music: document.querySelector('[name="enable_music"]').checked,
+            enable_quiz: document.querySelector('[name="enable_quiz"]').checked,
+            enable_polaroids: document.querySelector('[name="enable_polaroids"]').checked,
+            enable_amo_list: document.querySelector('[name="enable_amo_list"]').checked,
+            enable_custom_messages: document.querySelector('[name="enable_custom_messages"]').checked,
+            maintenance_mode: document.querySelector('[name="maintenance_mode"]').checked,
+            max_polaroids: parseInt(document.querySelector('[name="max_polaroids"]').value, 10),
+            max_music_songs: parseInt(document.querySelector('[name="max_music_songs"]').value, 10),
+            max_amo_messages: parseInt(document.querySelector('[name="max_amo_messages"]').value, 10),
+            maintenance_message: document.querySelector('[name="maintenance_message"]').value
+        };
+        const res = await painelFetch('/admin/system-config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const j = await res.json().catch(function () { return {}; });
+        if (res.ok) showOk('Configurações guardadas.');
+        else showBad(j.detail || 'Erro ao guardar.');
+    });
+
+    loadCfg();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "sandroni/base.html" %}
+{% block title %}Catálogo — AutoPeças Sandroni{% endblock %}
+
+{% block content %}
+<div class="page-banner page-banner--catalog">
+    <div class="wrap">
+        <h1>Catálogo de peças</h1>
+        <p>Milhares de autopeças para o seu veículo — <strong>+40 anos</strong> de tradição e confiança</p>
+        <div class="catalog-active-filters" id="catalog-active-filters" hidden></div>
+    </div>
+</div>
+
+<section class="section">
+    <div class="wrap catalog-layout">
+        <aside class="filters">
+            <h3>Filtros</h3>
+            <div class="field">
+                <span>Buscar</span>
+                <input type="search" id="filter-q" placeholder="Nome, OEM, SKU...">
+            </div>
+            <div class="field">
+                <span>Categoria</span>
+                <select id="filter-category"><option value="">Todas</option></select>
+            </div>
+            <div class="field">
+                <span>Marca</span>
+                <select id="filter-brand"><option value="">Todas</option></select>
+            </div>
+            <label class="field-check">
+                <input type="checkbox" id="filter-stock"> Apenas em estoque
+            </label>
+            <button type="button" class="btn btn-primary btn-full" id="btn-apply-filters">Aplicar filtros</button>
+        </aside>
+        <div>
+            <div class="catalog-toolbar">
+                <span id="catalog-count">Carregando...</span>
+                <select class="sort-select" id="sort-select">
+                    <option value="">Ordenar: Mais recentes</option>
+                    <option value="price_asc">Menor preço</option>
+                    <option value="price_desc">Maior preço</option>
+                </select>
+            </div>
+            <div class="product-grid" id="catalog-products"></div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>document.addEventListener('DOMContentLoaded', () => Sandroni.loadCatalog());</script>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "sandroni/base.html" %}
+{% block title %}Gerenciar peças — AutoPeças Sandroni{% endblock %}
+
+{% block content %}
+<div class="page-banner">
+    <div class="wrap">
+        <h1>Gerenciar peças</h1>
+        <p>Painel administrativo AutoPeças Sandroni</p>
+    </div>
+</div>
+<section class="section">
+    <div class="wrap" id="manage-page"><p class="loading">Verificando permissões...</p></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>document.addEventListener('DOMContentLoaded', () => Sandroni.initManage());</script>
+{% endblock %}
