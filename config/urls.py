@@ -7,6 +7,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve
 from django.shortcuts import redirect
+from django.http import JsonResponse
 from api.views.contact_views import build_whatsapp_url, normalize_whatsapp_phone, DEFAULT_MESSAGE
 from api.models import SystemConfig
 import os
@@ -28,6 +29,16 @@ def payment_callback_view(request):
     return redirect(f'{settings.FRONTEND_URL.rstrip("/")}/pedidos/')
 
 
+def health_check_view(request):
+    dist = getattr(settings, 'FRONTEND_DIST', None)
+    index_ok = bool(dist and (dist / 'index.html').is_file())
+    return JsonResponse({
+        'status': 'ok',
+        'serve_react_spa': getattr(settings, 'SERVE_REACT_SPA', False),
+        'frontend_build': index_ok,
+    })
+
+
 def whatsapp_redirect_view(request):
     config = SystemConfig.get_config()
     phone = normalize_whatsapp_phone(config.store_whatsapp)
@@ -43,6 +54,7 @@ static_patterns = [
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/', include('api.urls')),
+    path('health/', health_check_view, name='health'),
 
     # WhatsApp (redirect externo)
     path('whatsapp/', whatsapp_redirect_view, name='whatsapp'),

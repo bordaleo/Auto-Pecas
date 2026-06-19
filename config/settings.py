@@ -11,7 +11,11 @@ from dotenv import load_dotenv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIST = BASE_DIR / 'frontend' / 'dist'
-SERVE_REACT_SPA = os.getenv('SERVE_REACT_SPA', '').lower() in ('1', 'true', 'yes')
+_serve_spa_env = os.getenv('SERVE_REACT_SPA', '').lower() in ('1', 'true', 'yes')
+_spa_index = FRONTEND_DIST / 'index.html'
+SERVE_REACT_SPA = _serve_spa_env or (
+    bool(os.getenv('RENDER')) and _spa_index.is_file()
+)
 
 # Carrega .env apenas em desenvolvimento (não sobrescreve variáveis do Render/Heroku)
 # No Render, variáveis vêm do Environment; .env não é commitado
