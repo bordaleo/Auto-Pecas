@@ -7,7 +7,7 @@ from django.conf import settings
 def site_domain(request):
     """Injeta SITE_DOMAIN em todos os templates (host atual ou fallback de produção)."""
     return {
-        'SITE_DOMAIN': request.get_host() if request else 'autopecassandroni.com.br',
+        'SITE_DOMAIN': request.get_host() if request else 'galelugipecas.com.br',
     }
 
 

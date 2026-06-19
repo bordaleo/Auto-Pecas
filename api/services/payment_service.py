@@ -75,28 +75,42 @@ class PaymentService:
 
             if not mp_items:
                 mp_items = [{
-                    "title": "AutoPeças Sandroni — Pedido",
+                    "title": "Galelugi Peças — Pedido",
                     "quantity": 1,
                     "unit_price": float(amount),
                     "currency_id": "BRL",
                 }]
+            else:
+                items_total = round(sum(i["quantity"] * i["unit_price"] for i in mp_items), 2)
+                target = round(float(amount), 2)
+                diff = round(target - items_total, 2)
+                if diff != 0:
+                    mp_items.append({
+                        "title": "Ajuste",
+                        "quantity": 1,
+                        "unit_price": diff,
+                        "currency_id": "BRL",
+                    })
 
             preference_data = {
                 "items": mp_items,
                 "payer": {"name": user_name, "email": user_email},
                 "back_urls": {
-                    "success": f"{frontend_url}/payment/success",
-                    "failure": f"{frontend_url}/payment/failure",
-                    "pending": f"{frontend_url}/payment/pending",
+                    "success": f"{frontend_url}/pedidos/",
+                    "failure": f"{frontend_url}/pedidos/",
+                    "pending": f"{frontend_url}/pedidos/",
                 },
                 "external_reference": external_reference,
                 "notification_url": f"{backend_url}/api/v1/payments/webhook",
-                "statement_descriptor": "SANDRONI",
+                "statement_descriptor": "GALELUGI",
                 "payment_methods": {
                     "excluded_payment_methods": [{"id": "consumer_credits"}],
                     "installments": 12,
                 },
             }
+            # auto_return só com URLs HTTPS (produção); em localhost HTTP o MP rejeita
+            if frontend_url.startswith("https://"):
+                preference_data["auto_return"] = "approved"
             response = self.sdk.preference().create(preference_data)
             if isinstance(response, dict) and response.get("status") in [200, 201]:
                 data = response.get("response", {})

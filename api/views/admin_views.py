@@ -7,14 +7,14 @@ from urllib.parse import quote
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.shortcuts import render, redirect
-from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.views.decorators.http import require_http_methods
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from api.authentication.jwt import decode_access_token
-from api.models import OpsAlertEvent, SystemConfig
+from api.models import OpsAlertEvent, SystemConfig, Order, Seller, ShippingStatus
 
 logger = logging.getLogger(__name__)
 
@@ -242,9 +242,12 @@ from api.serializers.system_config import SystemConfigSerializer
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
 def system_config_public_api(request):
+    from django.conf import settings
     from api.serializers.system_config import SystemConfigPublicSerializer
     config = SystemConfig.get_config()
-    return Response(SystemConfigPublicSerializer(config).data)
+    data = SystemConfigPublicSerializer(config).data
+    data['mercadopago_public_key'] = getattr(settings, 'MERCADOPAGO_PUBLIC_KEY', '') or ''
+    return Response(data)
 
 
 @api_view(["GET", "PUT"])
@@ -267,3 +270,109 @@ def system_config_api(request):
 def apply_global_changes(config):
     """Placeholder — mantido por compatibilidade com painel legado."""
     pass
+
+
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def painel_session_api(request):
+    return Response({"authenticated": painel_api_authorized(request)})
+
+
+@csrf_exempt
+@api_view(["POST"])
+@permission_classes([permissions.AllowAny])
+def painel_login_api(request):
+    password = (request.data.get("password") or "").strip()
+    expected = (getattr(settings, "PAINEL_GATE_PASSWORD", None) or "").strip()
+    if not expected:
+        return Response(
+            {"detail": "Painel desativado: defina PAINEL_GATE_PASSWORD."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    if secrets.compare_digest(password, expected):
+        request.session[PAINEL_SESSION_KEY] = True
+        request.session.set_expiry(60 * 60 * 12)
+        return Response({"ok": True})
+    return Response({"detail": "Senha incorreta."}, status=status.HTTP_403_FORBIDDEN)
+
+
+@csrf_exempt
+@api_view(["POST"])
+@permission_classes([permissions.AllowAny])
+def painel_logout_api(request):
+    request.session.flush()
+    return Response({"ok": True})
+
+
+@api_view(["GET", "PATCH"])
+@permission_classes([permissions.AllowAny])
+def painel_order_detail_api(request, order_id):
+    if not painel_api_authorized(request):
+        return Response({"detail": "Não autorizado."}, status=status.HTTP_403_FORBIDDEN)
+    try:
+        order = Order.objects.prefetch_related("items").get(pk=order_id)
+    except Order.DoesNotExist:
+        return Response({"detail": "Pedido não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+    from api.serializers.shop import ShopOrderSerializer
+
+    if request.method == "GET":
+        return Response(ShopOrderSerializer(order).data)
+
+    data = request.data
+    update_fields = ["updated_at"]
+    if "tracking_code" in data:
+        order.tracking_code = (data.get("tracking_code") or "").strip()
+        update_fields.append("tracking_code")
+    if "carrier" in data:
+        order.carrier = (data.get("carrier") or "").strip()
+        update_fields.append("carrier")
+    if "shipping_status" in data:
+        status_val = data.get("shipping_status")
+        valid = {c[0] for c in ShippingStatus.choices}
+        if status_val not in valid:
+            return Response({"detail": "Status de envio inválido."}, status=status.HTTP_400_BAD_REQUEST)
+        order.shipping_status = status_val
+        update_fields.append("shipping_status")
+        if status_val == ShippingStatus.SHIPPED and not order.shipped_at:
+            from django.utils import timezone
+            order.shipped_at = timezone.now()
+            update_fields.append("shipped_at")
+    order.save(update_fields=update_fields)
+    return Response(ShopOrderSerializer(order).data)
+
+
+@api_view(["GET", "PATCH"])
+@permission_classes([permissions.AllowAny])
+def painel_sellers_api(request):
+    if not painel_api_authorized(request):
+        return Response({"detail": "Não autorizado."}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == "GET":
+        sellers = Seller.objects.select_related("user").order_by("-created_at")[:100]
+        rows = [
+            {
+                "id": s.id,
+                "store_name": s.store_name,
+                "slug": s.slug,
+                "status": s.status,
+                "document": s.document,
+                "phone": s.phone,
+                "user_email": s.user.email,
+                "created_at": s.created_at.isoformat(),
+            }
+            for s in sellers
+        ]
+        return Response({"results": rows})
+
+    seller_id = request.data.get("id")
+    new_status = request.data.get("status")
+    if not seller_id or new_status not in {Seller.Status.ACTIVE, Seller.Status.SUSPENDED, Seller.Status.PENDING}:
+        return Response({"detail": "Dados inválidos."}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        seller = Seller.objects.get(pk=seller_id)
+    except Seller.DoesNotExist:
+        return Response({"detail": "Vendedor não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+    seller.status = new_status
+    seller.save(update_fields=["status", "updated_at"])
+    return Response({"ok": True, "id": seller.id, "status": seller.status})

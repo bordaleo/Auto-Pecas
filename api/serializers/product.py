@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.utils.text import slugify
 from api.models import Category, Product, ProductImage
+from api.services.seo_service import build_product_seo
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -24,13 +25,15 @@ class ProductListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True, default='')
     category_slug = serializers.CharField(source='category.slug', read_only=True, default='')
     in_stock = serializers.BooleanField(read_only=True)
+    seller_name = serializers.CharField(source='seller.store_name', read_only=True, default='')
+    seller_slug = serializers.CharField(source='seller.slug', read_only=True, default='')
 
     class Meta:
         model = Product
         fields = [
             'id', 'name', 'slug', 'sku', 'oem_code', 'brand', 'price', 'compare_at_price',
             'stock', 'in_stock', 'image_url', 'is_featured', 'category_name', 'category_slug',
-            'compatible_vehicles',
+            'compatible_vehicles', 'seller_name', 'seller_slug',
         ]
 
 
@@ -38,14 +41,44 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
     in_stock = serializers.BooleanField(read_only=True)
+    seller_name = serializers.CharField(source='seller.store_name', read_only=True, default='')
+    seller_slug = serializers.CharField(source='seller.slug', read_only=True, default='')
+    sales_count = serializers.SerializerMethodField()
+    sales_revenue = serializers.SerializerMethodField()
+    seo_title = serializers.SerializerMethodField()
+    seo_description = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
             'id', 'name', 'slug', 'description', 'sku', 'oem_code', 'brand', 'price',
             'compare_at_price', 'stock', 'in_stock', 'image_url', 'is_featured', 'is_active',
-            'compatible_vehicles', 'category', 'images', 'created_at', 'updated_at',
+            'compatible_vehicles', 'category', 'images', 'seller_name', 'seller_slug',
+            'sales_count', 'sales_revenue', 'seo_title', 'seo_description',
+            'created_at', 'updated_at',
         ]
+
+    def get_seo_title(self, obj):
+        return build_product_seo(obj)['seo_title']
+
+    def get_seo_description(self, obj):
+        return build_product_seo(obj)['seo_description']
+
+    def get_sales_count(self, obj):
+        if hasattr(obj, 'sales_count'):
+            return obj.sales_count or 0
+        stats = getattr(obj, '_sales_stats', None)
+        if stats:
+            return stats.get('count', 0)
+        return 0
+
+    def get_sales_revenue(self, obj):
+        if hasattr(obj, 'sales_revenue'):
+            return str(obj.sales_revenue or '0.00')
+        stats = getattr(obj, '_sales_stats', None)
+        if stats:
+            return str(stats.get('revenue', '0.00'))
+        return '0.00'
 
 
 class ProductWriteSerializer(serializers.ModelSerializer):
@@ -69,6 +102,11 @@ class ProductWriteSerializer(serializers.ModelSerializer):
         if not slug:
             raise serializers.ValidationError('Slug inválido.')
         return slug
+
+    def validate_image_url(self, value):
+        if self.context.get('require_image') and not (value or '').strip():
+            raise serializers.ValidationError('Envie uma foto real da peça antes de publicar.')
+        return value
 
     def create(self, validated_data):
         extra_images = validated_data.pop('extra_images', [])

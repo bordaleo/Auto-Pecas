@@ -65,7 +65,7 @@ class PaymentProcessView(APIView):
 
         payload = dict(form_data)
         payload["transaction_amount"] = float(order.amount)
-        payload["description"] = f"Pedido AutoPeças Sandroni #{order.id}"
+        payload["description"] = f"Pedido Galelugi Peças #{order.id}"
         payload["external_reference"] = f"order_{order.id}_user_{request.user.id}"
         payer = payload.get("payer") or {}
         if not isinstance(payer, dict):

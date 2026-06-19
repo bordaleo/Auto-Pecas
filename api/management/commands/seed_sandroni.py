@@ -248,7 +248,7 @@ class Command(BaseCommand):
         total = Product.objects.filter(is_active=True).count()
         config = SystemConfig.get_config()
         config.store_address = 'Rua São Sabino, 262'
-        config.store_name = 'AutoPeças Sandroni'
+        config.store_name = 'Galelugi Peças'
         config.store_whatsapp = '11974452478'
         config.store_phone = '(11) 97445-2478'
         config.save(update_fields=['store_address', 'store_name', 'store_whatsapp', 'store_phone', 'updated_at'])

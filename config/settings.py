@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIST = BASE_DIR / 'frontend' / 'dist'
+SERVE_REACT_SPA = os.getenv('SERVE_REACT_SPA', '').lower() in ('1', 'true', 'yes')
 
 # Carrega .env apenas em desenvolvimento (não sobrescreve variáveis do Render/Heroku)
 # No Render, variáveis vêm do Environment; .env não é commitado
@@ -302,7 +304,7 @@ EMAIL_TIMEOUT = int(os.getenv('SMTP_TIMEOUT', '30'))
 EMAIL_HOST_USER = os.getenv('SMTP_USER', None)
 EMAIL_HOST_PASSWORD = os.getenv('SMTP_PASSWORD', None)
 DEFAULT_FROM_EMAIL = os.getenv('SMTP_FROM_EMAIL', EMAIL_HOST_USER or 'suporte.amorlize@gmail.com')
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:8000')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 BACKEND_URL = os.getenv('BACKEND_URL', 'http://localhost:8000')
 
 
@@ -316,7 +318,7 @@ MERCADOPAGO_WEBHOOK_SECRET = os.getenv('MERCADOPAGO_WEBHOOK_SECRET', None)
 # Public Key para o frontend (Bricks). Em produção use a chave de PRODUÇÃO para evitar 401 na API de CEP (boleto).
 # Configure via variável de ambiente MERCADOPAGO_PUBLIC_KEY no Render.
 # Public Key de produção: APP_USR-77e67d38-7d72-45f6-900d-43be585effcd
-MERCADOPAGO_PUBLIC_KEY = os.getenv('MERCADOPAGO_PUBLIC_KEY', 'TEST-52b8b435-fb3a-4793-b8f4-fe5a261260e7')
+MERCADOPAGO_PUBLIC_KEY = os.getenv('MERCADOPAGO_PUBLIC_KEY', '') or None
 
 # Cloudinary — imagens de produtos
 CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME', None)
@@ -329,7 +331,7 @@ CLOUDINARY_ENABLED = all([
     CLOUDINARY_API_SECRET,
 ])
 
-CLOUDINARY_PRODUCTS_PREFIX = os.getenv('CLOUDINARY_PRODUCTS_PREFIX', 'sandroni/products').strip().strip('/')
+CLOUDINARY_PRODUCTS_PREFIX = os.getenv('CLOUDINARY_PRODUCTS_PREFIX', 'galelugi/products').strip().strip('/')
 
 if CLOUDINARY_ENABLED:
     cloudinary.config(
@@ -341,8 +343,8 @@ if CLOUDINARY_ENABLED:
 
 
 # Django Admin Configuration
-ADMIN_SITE_HEADER = "AutoPeças Sandroni — Administração"
-ADMIN_SITE_TITLE = "Sandroni Admin"
+ADMIN_SITE_HEADER = "Galelugi Peças — Administração"
+ADMIN_SITE_TITLE = "Galelugi Admin"
 ADMIN_INDEX_TITLE = "Painel de Controle"
 
 # X-Frame-Options

@@ -9,7 +9,7 @@ class UserSerializer(serializers.ModelSerializer):
     """Serializer para o modelo User"""
     class Meta:
         model = User
-        fields = ['id', 'email', 'name', 'phone', 'is_active', 'is_staff', 'created_at', 'updated_at']
+        fields = ['id', 'email', 'name', 'phone', 'shipping_zip', 'shipping_address', 'shipping_city', 'shipping_state', 'is_active', 'is_staff', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
@@ -96,7 +96,7 @@ class UserResponseSerializer(serializers.ModelSerializer):
     """Serializer de resposta para o usuário"""
     class Meta:
         model = User
-        fields = ['id', 'email', 'name', 'phone', 'is_active', 'is_staff', 'is_superuser', 'created_at', 'updated_at']
+        fields = ['id', 'email', 'name', 'phone', 'shipping_zip', 'shipping_address', 'shipping_city', 'shipping_state', 'is_active', 'is_staff', 'is_superuser', 'created_at', 'updated_at']
         read_only_fields = ['id', 'is_active', 'is_staff', 'is_superuser', 'created_at', 'updated_at']
 
 
@@ -107,7 +107,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['email', 'name', 'phone', 'password', 'password_confirm']
+        fields = ['email', 'name', 'phone', 'shipping_zip', 'shipping_address', 'shipping_city', 'shipping_state', 'password', 'password_confirm']
     
     def validate_email(self, value):
         """Valida se o email não está em uso por outro usuário e formato válido"""

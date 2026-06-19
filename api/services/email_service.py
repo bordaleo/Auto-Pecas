@@ -8,7 +8,7 @@ from services.email_service import send_email
 
 logger = logging.getLogger(__name__)
 
-STORE = "AutoPeças Sandroni"
+STORE = "Galelugi Peças"
 ACCENT = "#e85d04"
 
 
@@ -106,6 +106,38 @@ class EmailService:
             f"text-decoration:none;border-radius:8px;font-weight:700;'>Ver meus pedidos</a></p>"
         )
         return send_email(to_email, f"Pedido #{order.id} confirmado — {STORE}", _wrap("Pedido confirmado", body))
+
+    def send_abandoned_cart_email(self, cart) -> bool:
+        to_email = (cart.email or "").strip()
+        if not to_email or not self.enabled or not cart.items:
+            return False
+        frontend = getattr(settings, "FRONTEND_URL", "http://127.0.0.1:3000").rstrip("/")
+        rows = ""
+        for item in cart.items[:6]:
+            name = item.get("name", "Peça")
+            qty = item.get("quantity", 1)
+            price = float(item.get("price", 0)) * qty
+            rows += (
+                f"<li style='margin:6px 0;'>{qty}x {name} — "
+                f"<strong>R$ {price:.2f}</strong></li>"
+            )
+        body = (
+            f"<p>Olá!</p>"
+            f"<p>Você deixou peças no carrinho da <strong>{STORE}</strong>. "
+            f"Elas ainda estão reservadas para você:</p>"
+            f"<ul style='padding-left:20px;'>{rows}</ul>"
+            f"<p style='font-size:18px;font-weight:700;'>Subtotal: R$ {cart.subtotal:.2f}</p>"
+            f"<p style='text-align:center;margin-top:24px;'>"
+            f"<a href='{frontend}/carrinho/' style='background:{ACCENT};color:#fff;padding:12px 28px;"
+            f"text-decoration:none;border-radius:8px;font-weight:700;'>Voltar ao carrinho</a></p>"
+            f"<p style='font-size:13px;color:#64748b;margin-top:16px;'>"
+            f"Use o cupom <strong>BEMVINDO10</strong> na primeira compra.</p>"
+        )
+        return send_email(
+            to_email,
+            f"Seu carrinho está esperando — {STORE}",
+            _wrap("Carrinho abandonado", body),
+        )
 
 
 email_service = EmailService()

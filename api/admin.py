@@ -3,15 +3,24 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from django.urls import reverse
 from .models import (
-    User, Order, OrderItem, OrderStatus, Category, Product, ProductImage,
+    User, Seller, Order, OrderItem, OrderStatus, Category, Product, ProductImage,
     PasswordResetToken, SystemConfig, OpsAlertEvent, SiteEngagementTotals,
+    Coupon, AbandonedCart,
 )
 
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
-    readonly_fields = ['product_name', 'product_sku', 'unit_price', 'quantity', 'image_url']
+    readonly_fields = ['product_name', 'product_sku', 'unit_price', 'quantity', 'image_url', 'seller', 'platform_fee', 'seller_earning']
+
+
+@admin.register(Seller)
+class SellerAdmin(admin.ModelAdmin):
+    list_display = ['store_name', 'user', 'status', 'commission_rate', 'created_at']
+    list_filter = ['status']
+    search_fields = ['store_name', 'user__email', 'document']
+    readonly_fields = ['created_at', 'updated_at']
 
 
 @admin.register(User)
@@ -132,6 +141,20 @@ class SiteEngagementTotalsAdmin(admin.ModelAdmin):
         return False
 
 
-admin.site.site_header = "AutoPeças Sandroni — Administração"
-admin.site.site_title = "Sandroni Admin"
+@admin.register(Coupon)
+class CouponAdmin(admin.ModelAdmin):
+    list_display = ['code', 'discount_type', 'discount_value', 'first_purchase_only', 'used_count', 'is_active']
+    search_fields = ['code']
+    list_filter = ['is_active', 'first_purchase_only']
+
+
+@admin.register(AbandonedCart)
+class AbandonedCartAdmin(admin.ModelAdmin):
+    list_display = ['email', 'subtotal', 'reminder_sent_at', 'recovered_at', 'updated_at']
+    search_fields = ['email']
+    readonly_fields = ['created_at', 'updated_at']
+
+
+admin.site.site_header = "Galelugi Peças — Administração"
+admin.site.site_title = "Galelugi Admin"
 admin.site.index_title = "Painel de Controle"

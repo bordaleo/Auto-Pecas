@@ -39,7 +39,7 @@ def get_existing_cloudinary_image_secure_url(public_id: str) -> str | None:
         return None
 
 
-def upload_image_if_needed(image_value, folder="sandroni/products"):
+def upload_image_if_needed(image_value, folder="galelugi/products"):
     if not image_value:
         return image_value
     if not isinstance(image_value, str):
@@ -54,7 +54,7 @@ def upload_image_if_needed(image_value, folder="sandroni/products"):
 
     image_bytes = _decode_image_bytes(raw)
     content_hash = hashlib.sha256(image_bytes).hexdigest()
-    prefix = (folder or "sandroni/products").strip().strip("/")
+    prefix = (folder or "galelugi/products").strip().strip("/")
     public_id = f"{prefix}/{content_hash}"
 
     existing = get_existing_cloudinary_image_secure_url(public_id)

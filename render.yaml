@@ -1,14 +1,16 @@
-# Render Blueprint - AutoPeças Sandroni
-# https://render.com/docs/blueprint-spec
+# Render Blueprint - Galelugi Peças
+# API + loja React no MESMO serviço → FRONTEND_URL e BACKEND_URL iguais
 
 services:
   - type: web
-    name: autopecas-sandroni
+    name: galelugi-pecas
     runtime: python
     region: oregon
 
     buildCommand: |
       pip install -r requirements.txt
+      cd frontend && npm ci && npm run build
+      cd ..
       python manage.py collectstatic --noinput
       python manage.py migrate --noinput
 
@@ -17,27 +19,26 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
-      - key: SECRET_KEY
-        generateValue: true
       - key: DEBUG
         value: "False"
+      - key: SERVE_REACT_SPA
+        value: "true"
       - key: ALLOWED_HOSTS
-        value: autopecassandroni.com.br,www.autopecassandroni.com.br,autopecas-sandroni.onrender.com
+        value: galelugi.com.br,www.galelugi.com.br,galelugi-pecas.onrender.com
       - key: FRONTEND_URL
-        value: https://autopecassandroni.com.br
+        value: https://galelugi-pecas.onrender.com
       - key: BACKEND_URL
-        value: https://autopecassandroni.com.br
+        value: https://galelugi-pecas.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
-        value: https://autopecassandroni.com.br,https://www.autopecassandroni.com.br,https://autopecas-sandroni.onrender.com
+        value: https://galelugi.com.br,https://www.galelugi.com.br,https://galelugi-pecas.onrender.com
       - key: CORS_ALLOWED_ORIGINS
-        value: https://autopecassandroni.com.br,https://www.autopecassandroni.com.br,https://autopecas-sandroni.onrender.com
+        value: https://galelugi.com.br,https://www.galelugi.com.br,https://galelugi-pecas.onrender.com
       - key: DATABASE_URL
         fromDatabase:
-          name: sandroni-db
+          name: galelugi-db
           property: connectionString
-      # Configure no painel Render: BREVO_API_KEY, SMTP_FROM_EMAIL, MERCADOPAGO_*, CLOUDINARY_*
 
 databases:
-  - name: sandroni-db
+  - name: galelugi-db
     plan: free
     region: oregon

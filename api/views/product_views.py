@@ -37,7 +37,7 @@ class ProductListView(ListAPIView):
     serializer_class = ProductListSerializer
 
     def get_queryset(self):
-        qs = Product.objects.filter(is_active=True).select_related('category')
+        qs = Product.objects.filter(is_active=True).select_related('category', 'seller')
         q = self.request.query_params.get('q', '').strip()
         category = self.request.query_params.get('category', '').strip()
         brand = self.request.query_params.get('brand', '').strip()
@@ -139,7 +139,7 @@ class ProductImageUploadView(APIView):
         try:
             url = upload_image_if_needed(
                 serializer.validated_data['image'],
-                folder='sandroni/products',
+                folder='galelugi/products',
             )
         except ValueError as e:
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)

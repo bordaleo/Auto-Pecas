@@ -37,6 +37,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, db_index=True, verbose_name="Email")
     name = models.CharField(max_length=255, verbose_name="Nome")
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Telefone")
+    shipping_zip = models.CharField(max_length=12, blank=True, default='', verbose_name="CEP")
+    shipping_address = models.CharField(max_length=255, blank=True, default='', verbose_name="Endereço")
+    shipping_city = models.CharField(max_length=120, blank=True, default='', verbose_name="Cidade")
+    shipping_state = models.CharField(max_length=2, blank=True, default='', verbose_name="UF")
     is_active = models.BooleanField(default=True, verbose_name="Ativo")
     is_staff = models.BooleanField(default=False, verbose_name="Staff")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
@@ -57,6 +61,53 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"{self.name} ({self.email})"
 
 
+class Seller(models.Model):
+    """Loja de vendedor no marketplace Galelugi."""
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Aguardando aprovação'
+        ACTIVE = 'active', 'Ativa'
+        SUSPENDED = 'suspended', 'Suspensa'
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='seller_profile',
+        verbose_name='Usuário',
+    )
+    store_name = models.CharField(max_length=120, verbose_name='Nome da loja')
+    slug = models.SlugField(max_length=120, unique=True, db_index=True, verbose_name='Slug')
+    description = models.TextField(blank=True, default='', verbose_name='Descrição')
+    document = models.CharField(max_length=20, blank=True, default='', verbose_name='CPF/CNPJ')
+    phone = models.CharField(max_length=20, blank=True, default='', verbose_name='Telefone')
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+        verbose_name='Status',
+    )
+    commission_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Comissão personalizada (%)',
+        help_text='Vazio = usa taxa padrão da plataforma',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
+
+    class Meta:
+        verbose_name = 'Vendedor'
+        verbose_name_plural = 'Vendedores'
+        db_table = 'sellers'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.store_name
+
+
 class DeliveryMethod(models.TextChoices):
     DELIVERY = 'delivery', 'Entrega'
     PICKUP = 'pickup', 'Retirada na loja'
@@ -66,6 +117,18 @@ class OrderStatus(models.TextChoices):
     PENDING = 'pending', 'Pendente'
     APPROVED = 'approved', 'Aprovado'
     REJECTED = 'rejected', 'Rejeitado'
+
+
+class ShippingStatus(models.TextChoices):
+    PENDING = 'pending', 'Aguardando envio'
+    PROCESSING = 'processing', 'Em separação'
+    SHIPPED = 'shipped', 'Enviado'
+    DELIVERED = 'delivered', 'Entregue'
+
+
+class CouponDiscountType(models.TextChoices):
+    PERCENT = 'percent', 'Percentual'
+    FIXED = 'fixed', 'Valor fixo'
 
 
 class Category(models.Model):
@@ -118,6 +181,14 @@ class Product(models.Model):
     image_url = models.URLField(max_length=500, blank=True, default='', verbose_name="Imagem principal")
     is_active = models.BooleanField(default=True, verbose_name="Ativo")
     is_featured = models.BooleanField(default=False, verbose_name="Destaque")
+    seller = models.ForeignKey(
+        'Seller',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='products',
+        verbose_name='Vendedor',
+    )
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -233,6 +304,19 @@ class Order(models.Model):
         verbose_name="Valor do frete",
     )
     notes = models.TextField(blank=True, default='', verbose_name="Observações")
+    discount_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="Desconto aplicado",
+    )
+    coupon_code = models.CharField(max_length=40, blank=True, default='', verbose_name="Cupom")
+    tracking_code = models.CharField(max_length=80, blank=True, default='', verbose_name="Código de rastreio")
+    carrier = models.CharField(max_length=80, blank=True, default='', verbose_name="Transportadora")
+    shipping_status = models.CharField(
+        max_length=20,
+        choices=ShippingStatus.choices,
+        default=ShippingStatus.PENDING,
+        verbose_name="Status do envio",
+    )
+    shipped_at = models.DateTimeField(null=True, blank=True, verbose_name="Enviado em")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
 
@@ -270,6 +354,26 @@ class OrderItem(models.Model):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Preço unitário")
     quantity = models.PositiveIntegerField(default=1, verbose_name="Quantidade")
     image_url = models.URLField(max_length=500, blank=True, default='', verbose_name="Imagem")
+    seller = models.ForeignKey(
+        'Seller',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='order_items',
+        verbose_name='Vendedor',
+    )
+    platform_fee = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Comissão Galelugi',
+    )
+    seller_earning = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Repasse ao vendedor',
+    )
 
     class Meta:
         verbose_name = "Item do pedido"
@@ -399,9 +503,9 @@ class OrderEmailVerificationToken(models.Model):
 
 
 class SystemConfig(models.Model):
-    """Configurações globais da loja AutoPeças Sandroni."""
+    """Configurações globais da loja Galelugi Peças."""
 
-    store_name = models.CharField(max_length=120, default='AutoPeças Sandroni', verbose_name="Nome da loja")
+    store_name = models.CharField(max_length=120, default='Galelugi Peças', verbose_name="Nome da loja")
     store_tagline = models.CharField(
         max_length=255,
         default='Peças automotivas com qualidade e confiança',
@@ -419,8 +523,21 @@ class SystemConfig(models.Model):
     free_shipping_min = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal('299.00'), verbose_name="Frete grátis acima de"
     )
+    marketplace_commission_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('12.00'),
+        verbose_name='Comissão do marketplace (%)',
+        help_text='Percentual retido pela Galelugi em cada venda de vendedor',
+    )
     maintenance_mode = models.BooleanField(default=False, verbose_name="Modo Manutenção")
     maintenance_message = models.TextField(null=True, blank=True, verbose_name="Mensagem de Manutenção")
+    google_analytics_id = models.CharField(
+        max_length=40, blank=True, default='', verbose_name="Google Analytics ID",
+    )
+    meta_pixel_id = models.CharField(
+        max_length=40, blank=True, default='', verbose_name="Meta Pixel ID",
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
 
@@ -440,6 +557,55 @@ class SystemConfig(models.Model):
 
     def __str__(self):
         return self.store_name
+
+
+class Coupon(models.Model):
+    """Cupom de desconto."""
+    code = models.CharField(max_length=40, unique=True, db_index=True, verbose_name="Código")
+    discount_type = models.CharField(
+        max_length=10, choices=CouponDiscountType.choices, default=CouponDiscountType.PERCENT,
+    )
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Valor do desconto")
+    first_purchase_only = models.BooleanField(default=False, verbose_name="Somente primeira compra")
+    min_order_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="Pedido mínimo",
+    )
+    usage_limit = models.PositiveIntegerField(null=True, blank=True, verbose_name="Limite de usos")
+    used_count = models.PositiveIntegerField(default=0, verbose_name="Vezes usado")
+    is_active = models.BooleanField(default=True, verbose_name="Ativo")
+    expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Expira em")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Cupom"
+        verbose_name_plural = "Cupons"
+        db_table = 'coupons'
+
+    def __str__(self):
+        return self.code
+
+
+class AbandonedCart(models.Model):
+    """Snapshot de carrinho para recuperação por e-mail."""
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, null=True, blank=True, related_name='abandoned_carts',
+    )
+    email = models.EmailField(db_index=True, verbose_name="E-mail")
+    items = models.JSONField(default=list, verbose_name="Itens")
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    reminder_sent_at = models.DateTimeField(null=True, blank=True, verbose_name="Lembrete enviado em")
+    recovered_at = models.DateTimeField(null=True, blank=True, verbose_name="Recuperado em")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Carrinho abandonado"
+        verbose_name_plural = "Carrinhos abandonados"
+        db_table = 'abandoned_carts'
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Carrinho {self.email} — R$ {self.subtotal}"
 
 
 class OpsAlertEvent(models.Model):
