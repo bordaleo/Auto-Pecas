@@ -31,6 +31,9 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-change-in-producti
 DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',') if h.strip()]
+_render_host = os.getenv('RENDER_EXTERNAL_HOSTNAME', '').strip()
+if _render_host and _render_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_render_host)
 
 
 # Application definition
@@ -200,8 +203,11 @@ REST_FRAMEWORK = {
 
 
 # CORS Configuration
+_render_url = os.getenv('RENDER_EXTERNAL_URL', '').strip()
 _cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://127.0.0.1:3000,http://127.0.0.1:8000')
 CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(',') if o.strip()]
+if _render_url and _render_url not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(_render_url)
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
@@ -209,6 +215,8 @@ if DEBUG:
 # CSRF - necessário para produção com HTTPS
 _csrf_origins = os.getenv('CSRF_TRUSTED_ORIGINS', 'http://127.0.0.1:8000')
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
+if _render_url and _render_url not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(_render_url)
 
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -304,8 +312,8 @@ EMAIL_TIMEOUT = int(os.getenv('SMTP_TIMEOUT', '30'))
 EMAIL_HOST_USER = os.getenv('SMTP_USER', None)
 EMAIL_HOST_PASSWORD = os.getenv('SMTP_PASSWORD', None)
 DEFAULT_FROM_EMAIL = os.getenv('SMTP_FROM_EMAIL', EMAIL_HOST_USER or 'suporte.amorlize@gmail.com')
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
-BACKEND_URL = os.getenv('BACKEND_URL', 'http://localhost:8000')
+FRONTEND_URL = os.getenv('FRONTEND_URL') or _render_url or 'http://localhost:3000'
+BACKEND_URL = os.getenv('BACKEND_URL') or _render_url or 'http://localhost:8000'
 
 
 # Password Reset
