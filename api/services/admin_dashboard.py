@@ -126,6 +126,11 @@ def get_painel_dashboard_slice(page: str, days: int = 14) -> dict:
             "sales_by_day": payload["sales_by_day"],
         }
 
+    if page == "financeiro":
+        from api.services.finance_service import get_platform_finance_payload
+        finance = get_platform_finance_payload(days=days)
+        return {"page": page, "period_days": days, "totals": totals, **finance}
+
     return {
         "page": "visao",
         "period_days": days,

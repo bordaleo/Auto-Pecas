@@ -376,3 +376,114 @@ def painel_sellers_api(request):
     seller.status = new_status
     seller.save(update_fields=["status", "updated_at"])
     return Response({"ok": True, "id": seller.id, "status": seller.status})
+
+
+@api_view(["GET", "PATCH"])
+@permission_classes([permissions.AllowAny])
+def painel_payouts_api(request):
+    if not painel_api_authorized(request):
+        return Response({"detail": "Não autorizado."}, status=status.HTTP_403_FORBIDDEN)
+
+    from api.models import SellerPayout, PayoutStatus
+    from api.serializers.marketplace import SellerPayoutSerializer, PayoutProcessSerializer
+    from api.services.payout_service import process_payout
+
+    if request.method == "GET":
+        status_filter = request.query_params.get("status", "").strip()
+        qs = SellerPayout.objects.select_related("seller").order_by("-created_at")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return Response({"results": SellerPayoutSerializer(qs[:100], many=True).data})
+
+    payout_id = request.data.get("id")
+    ser = PayoutProcessSerializer(data=request.data)
+    if not ser.is_valid():
+        return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        payout = SellerPayout.objects.get(pk=payout_id)
+    except SellerPayout.DoesNotExist:
+        return Response({"detail": "Repasse não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+    try:
+        updated = process_payout(
+            payout,
+            ser.validated_data["status"],
+            ser.validated_data.get("admin_notes", ""),
+            ser.validated_data.get("payment_reference", ""),
+        )
+    except ValueError as e:
+        return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    if updated.status == 'paid':
+        from api.services.notification_service import notify_payout_paid
+        notify_payout_paid(updated.seller, updated)
+    return Response(SellerPayoutSerializer(updated).data)
+
+
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def painel_finance_api(request):
+    if not painel_api_authorized(request):
+        return Response({"detail": "Não autorizado."}, status=status.HTTP_403_FORBIDDEN)
+    from api.services.finance_service import get_platform_finance_payload
+    try:
+        days = int(request.query_params.get("days", 30))
+    except (TypeError, ValueError):
+        days = 30
+    return Response(get_platform_finance_payload(days=days))
+
+
+@api_view(["GET", "PATCH"])
+@permission_classes([permissions.AllowAny])
+def painel_invoices_api(request):
+    if not painel_api_authorized(request):
+        return Response({"detail": "Não autorizado."}, status=status.HTTP_403_FORBIDDEN)
+
+    from api.models import InvoiceRequest, InvoiceStatus
+    from api.services.notification_service import notify_invoice_issued
+
+    if request.method == "GET":
+        status_filter = (request.query_params.get("status") or "").strip()
+        qs = InvoiceRequest.objects.select_related("order", "user", "seller").order_by("-created_at")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return Response({
+            "results": [
+                {
+                    "id": r.id,
+                    "order_id": r.order_id,
+                    "user_email": r.user.email,
+                    "seller_name": r.seller.store_name if r.seller_id else "Galelugi Peças",
+                    "cnpj": r.cnpj,
+                    "company_name": r.company_name,
+                    "company_email": r.company_email,
+                    "status": r.status,
+                    "status_display": r.get_status_display(),
+                    "invoice_number": r.invoice_number,
+                    "invoice_url": r.invoice_url,
+                    "admin_notes": r.admin_notes,
+                    "created_at": r.created_at.isoformat(),
+                }
+                for r in qs[:100]
+            ],
+        })
+
+    inv_id = request.data.get("id")
+    try:
+        inv = InvoiceRequest.objects.select_related("user").get(pk=inv_id)
+    except InvoiceRequest.DoesNotExist:
+        return Response({"detail": "Solicitação não encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+    new_status = request.data.get("status")
+    if new_status in dict(InvoiceStatus.choices):
+        inv.status = new_status
+    if "invoice_number" in request.data:
+        inv.invoice_number = (request.data.get("invoice_number") or "").strip()
+    if "invoice_url" in request.data:
+        inv.invoice_url = (request.data.get("invoice_url") or "").strip()
+    if "admin_notes" in request.data:
+        inv.admin_notes = (request.data.get("admin_notes") or "").strip()
+    inv.save()
+
+    if inv.status == InvoiceStatus.ISSUED:
+        notify_invoice_issued(inv.user, inv)
+
+    return Response({"ok": True, "id": inv.id, "status": inv.status})

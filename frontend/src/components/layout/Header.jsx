@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import Logo from '../Logo';
 import CategoryNav from '../CategoryNav';
+import NotificationBell from '../NotificationBell';
 import { SidebarToggle } from './SideNav';
 
 export default function Header({ onOpenAuth, onOpenSidebar }) {
@@ -49,6 +50,7 @@ export default function Header({ onOpenAuth, onOpenSidebar }) {
           </form>
 
           <div className="header-actions">
+            {user && <NotificationBell />}
             {user ? (
               <Link to="/perfil/" className="header-action">
                 <span className="header-action-label">{firstName}</span>

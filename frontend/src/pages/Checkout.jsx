@@ -47,6 +47,8 @@ export default function Checkout() {
   const [couponLabel, setCouponLabel] = useState('');
   const [brickError, setBrickError] = useState('');
   const [pixPayment, setPixPayment] = useState(null);
+  const [subOrders, setSubOrders] = useState([]);
+  const [orderGroupId, setOrderGroupId] = useState(null);
   const [form, setForm] = useState({
     shipping_zip: '',
     shipping_address: '',
@@ -101,11 +103,21 @@ export default function Checkout() {
           delivery_method: 'delivery',
           shipping_zip: digits,
           subtotal: Number(total).toFixed(2),
+          cart_items: items.map((item) => ({
+            price: item.price,
+            quantity: item.quantity,
+            weight_kg: item.weight_kg || 1,
+            width_cm: item.width_cm || 20,
+            height_cm: item.height_cm || 10,
+            length_cm: item.length_cm || 30,
+          })),
         }),
       });
       const fee = parseFloat(quote.shipping_fee) || 0;
       setShippingFee(fee);
-      setShippingLabel(fee === 0 ? 'Frete grátis' : formatCurrency(fee));
+      const service = quote.shipping_service_name ? ` (${quote.shipping_service_name})` : '';
+      const days = quote.shipping_days ? ` · ${quote.shipping_days} dia(s)` : '';
+      setShippingLabel(fee === 0 ? 'Frete grátis' : `${formatCurrency(fee)}${service}${days}`);
     } catch (error) {
       setShippingFee(0);
       setShippingLabel('Informe o CEP');
@@ -115,7 +127,7 @@ export default function Checkout() {
 
   useEffect(() => {
     quoteShipping();
-  }, [deliveryMethod, total, form.shipping_zip, freeMin]);
+  }, [deliveryMethod, total, form.shipping_zip, freeMin, items]);
 
   const applyCoupon = async () => {
     if (!couponCode.trim()) {
@@ -304,12 +316,14 @@ export default function Checkout() {
       const redirectUrl = pref.init_point || pref.sandbox_init_point || '';
       setPreferenceId(pref.preference_id);
       setPaymentUrl(redirectUrl);
-      setOrderAmount(parseFloat(order.amount));
+      setOrderAmount(parseFloat(order.total_amount || order.amount));
+      setSubOrders(order.sub_orders || []);
+      setOrderGroupId(order.order_group_id || null);
       setShowPayment(true);
       setBrickError('');
       setPixPayment(null);
       const payerEmail = form.order_email || user?.email || '';
-      const brickAmount = pref.brick_amount ?? parseFloat(order.amount);
+      const brickAmount = pref.brick_amount ?? parseFloat(order.total_amount || order.amount);
       await initBrick(pref.preference_id, brickAmount, payerEmail);
       showToast('Pedido criado! Escolha como pagar abaixo.');
     } catch (error) {
@@ -462,7 +476,23 @@ export default function Checkout() {
           <h2 className="checkout-section-title">Pagamento Mercado Pago</h2>
           <p className="form-hint payment-panel-total">
             Total do pedido: <strong>{formatCurrency(orderAmount)}</strong>
+            {orderGroupId && ` · Compra #${orderGroupId}`}
           </p>
+
+          {subOrders.length > 1 && (
+            <div className="checkout-sub-orders">
+              <h3>Entregas por loja</h3>
+              {subOrders.map((sub) => (
+                <div key={sub.id} className="checkout-sub-order">
+                  <strong>{sub.store_label || sub.fulfillment_seller_name}</strong>
+                  <span>
+                    {formatCurrency(sub.amount)}
+                    {sub.shipping_fee > 0 ? ` · Frete ${formatCurrency(sub.shipping_fee)}` : ' · Frete grátis'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {pixPayment ? (
             <PixPaymentPanel

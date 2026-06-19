@@ -39,4 +39,6 @@ def seller_dashboard_stats(seller):
         'sales_gross': str(sold['gross'] or Decimal('0.00')),
         'sales_earnings': str(sold['total'] or Decimal('0.00')),
         'commission_rate': str(get_commission_rate(seller)),
+        'balance_available': str(seller.balance_available),
+        'balance_pending': str(seller.balance_pending),
     }

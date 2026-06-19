@@ -30,3 +30,6 @@ SMTP_USE_SSL = True
 BREVO_API_KEY = ''
 
 PAINEL_GATE_PASSWORD = 'troque-esta-senha'
+
+# Opcional — frete real via Melhor Envio (sandbox ou produção)
+MELHOR_ENVIO_TOKEN = ''

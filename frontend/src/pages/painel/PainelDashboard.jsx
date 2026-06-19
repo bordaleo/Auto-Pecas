@@ -24,20 +24,26 @@ export function PainelDashboard() {
 
   useEffect(() => {
     if (!ready) return;
-    painelApi('/painel/dashboard?page=visao&days=14').then(setData).catch(() => {});
+    Promise.all([
+      painelApi('/painel/dashboard?page=visao&days=14'),
+      painelApi('/painel/finance?days=30'),
+    ]).then(([dash, finance]) => setData({ ...dash, finance })).catch(() => {});
   }, [ready]);
 
   if (!ready || !data) return <p>Carregando...</p>;
   const t = data.totals || {};
+  const f = data.finance || {};
 
   return (
     <div>
       <h1>Visão geral</h1>
       <div className="painel-stats">
         <article><strong>{formatCurrency(t.revenue || 0)}</strong><span>Receita (14d)</span></article>
+        <article><strong>{formatCurrency(f.platform_profit_estimate || 0)}</strong><span>Lucro plataforma (30d)</span></article>
+        <article><strong>{formatCurrency(f.platform_commission || 0)}</strong><span>Comissões (30d)</span></article>
+        <article><strong>{formatCurrency(f.pending_payouts || 0)}</strong><span>Repasses pendentes</span></article>
         <article><strong>{t.orders_approved || 0}</strong><span>Pedidos pagos</span></article>
         <article><strong>{t.products || 0}</strong><span>Peças ativas</span></article>
-        <article><strong>{t.users || 0}</strong><span>Usuários</span></article>
       </div>
       <h2>Pedidos recentes</h2>
       <div className="painel-table">

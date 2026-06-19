@@ -12,6 +12,7 @@ class ShippingQuoteSerializer(serializers.Serializer):
     delivery_method = serializers.ChoiceField(choices=DeliveryMethod.choices, default=DeliveryMethod.DELIVERY)
     shipping_zip = serializers.CharField(max_length=12, required=False, allow_blank=True)
     subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.00'))
+    cart_items = serializers.ListField(child=serializers.DictField(), required=False, allow_empty=True)
 
 
 class CheckoutSerializer(serializers.Serializer):
@@ -76,12 +77,17 @@ class ShopOrderSerializer(serializers.ModelSerializer):
     shipping_status_display = serializers.CharField(source='get_shipping_status_display', read_only=True)
     subtotal = serializers.SerializerMethodField()
     tracking_url = serializers.SerializerMethodField()
+    order_group_id = serializers.IntegerField(source='order_group_id', read_only=True, allow_null=True)
+    fulfillment_seller_name = serializers.CharField(
+        source='fulfillment_seller.store_name', read_only=True, default='Galelugi Peças',
+    )
+    store_label = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = [
             'id', 'status', 'status_display', 'amount', 'subtotal', 'shipping_fee',
-            'discount_amount', 'coupon_code',
+            'discount_amount', 'coupon_code', 'order_group_id', 'fulfillment_seller_name', 'store_label',
             'delivery_method', 'delivery_method_display',
             'shipping_status', 'shipping_status_display', 'tracking_code', 'carrier',
             'tracking_url', 'shipped_at',
@@ -100,6 +106,11 @@ class ShopOrderSerializer(serializers.ModelSerializer):
         if code.startswith('http'):
             return code
         return f'https://rastreamento.correios.com.br/app/index.php?objeto={code}'
+
+    def get_store_label(self, obj):
+        if obj.fulfillment_seller_id:
+            return obj.fulfillment_seller.store_name
+        return 'Galelugi Peças'
 
 
 class ShopPaymentPreferenceSerializer(serializers.Serializer):

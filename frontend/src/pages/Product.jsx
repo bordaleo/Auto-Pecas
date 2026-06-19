@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { api, buildWhatsAppProductUrl, formatCurrency } from '../api/client';
 import { calcInstallment } from '../utils/commerce';
 import { getSavedZip, saveZip } from '../components/ProductCard';
+import ProductReviews from '../components/ProductReviews';
+import ProductChat from '../components/ProductChat';
 import PageSeo from '../components/PageSeo';
 import { useCart } from '../context/CartContext';
 import { useStore } from '../context/StoreContext';
@@ -120,6 +122,21 @@ export default function Product() {
           {product.oem_code && <span className="tag">OEM {product.oem_code}</span>}
         </div>
         <h1>{product.name}</h1>
+        <div className="part-badges">
+          {product.part_condition && (
+            <span className="part-badge">
+              {{ new: 'Nova', used: 'Usada', reconditioned: 'Recondicionada' }[product.part_condition] || product.part_condition}
+            </span>
+          )}
+          {product.part_origin && (
+            <span className="part-badge">
+              {{ original: 'Original', parallel: 'Paralela', remanufactured: 'Remanufaturada' }[product.part_origin] || product.part_origin}
+            </span>
+          )}
+          {product.warranty_days > 0 && (
+            <span className="part-badge">Garantia {product.warranty_days} dias</span>
+          )}
+        </div>
         <div className="product-price">{formatCurrency(product.price)}</div>
         <div className="product-promo-banner">
           <span>em <strong>12x {calcInstallment(product.price)}</strong> sem juros</span>
@@ -141,16 +158,30 @@ export default function Product() {
         </div>
 
         <span className={inStock ? 'gl-card-stock' : 'gl-card-oos'}>
-          {inStock ? `${product.stock} un. em estoque` : 'Indisponível'}
+          {inStock ? `${product.available_stock ?? product.stock} un. em estoque` : 'Indisponível'}
         </span>
+        {(product.average_rating > 0) && (
+          <p className="product-rating">★ {product.average_rating} ({product.review_count} avaliações)</p>
+        )}
         <p style={{ marginTop: '1rem', color: 'rgba(0,0,0,.65)' }}>
           {product.description || 'Peça automotiva Galelugi Peças.'}
         </p>
-        {product.compatible_vehicles && (
+        {product.vehicle_models?.length > 0 && (
+          <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#ededed', borderRadius: 6 }}>
+            <strong>Veículos compatíveis:</strong>
+            <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
+              {product.vehicle_models.map((v) => (
+                <li key={v.id}>{v.brand} {v.name} ({v.year_start}-{v.year_end})</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {product.compatible_vehicles && !product.vehicle_models?.length && (
           <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#ededed', borderRadius: 6 }}>
             <strong>Compatível:</strong> {product.compatible_vehicles}
           </div>
         )}
+        <ProductChat product={product} />
         <div className="qty-row">
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQty(Math.max(1, qty - 1))}>−</button>
           <input value={qty} readOnly />
@@ -163,6 +194,9 @@ export default function Product() {
           Dúvida sobre compatibilidade? WhatsApp
         </a>
       </div>
+    </div>
+    <div className="wrap product-reviews-wrap">
+      <ProductReviews productId={product.id} />
     </div>
     </>
   );

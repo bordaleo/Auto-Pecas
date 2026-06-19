@@ -25,6 +25,9 @@ import PainelOrders from './pages/painel/PainelOrders';
 import PainelConfig from './pages/painel/PainelConfig';
 import PainelErrors from './pages/painel/PainelErrors';
 import PainelSellers from './pages/painel/PainelSellers';
+import PainelFinance from './pages/painel/PainelFinance';
+import PainelPayouts from './pages/painel/PainelPayouts';
+import PainelInvoices from './pages/painel/PainelInvoices';
 
 export default function App() {
   return (
@@ -38,6 +41,9 @@ export default function App() {
                 <Route path="painel" element={<PainelLayout />}>
                   <Route index element={<Navigate to="visao" replace />} />
                   <Route path="visao" element={<PainelDashboard />} />
+                  <Route path="financeiro" element={<PainelFinance />} />
+                  <Route path="repasses" element={<PainelPayouts />} />
+                  <Route path="nfe" element={<PainelInvoices />} />
                   <Route path="pedidos" element={<PainelOrders />} />
                   <Route path="vendedores" element={<PainelSellers />} />
                   <Route path="config" element={<PainelConfig />} />

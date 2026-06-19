@@ -9,7 +9,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.models import Order, OrderStatus
+from api.models import Order, OrderGroup, OrderStatus
 from api.serializers.payment import PaymentStatusSerializer
 from api.services.payment_service import payment_service
 
@@ -28,6 +28,13 @@ def _payment_id_int(payment: dict) -> int:
 def _find_order(payment_info: dict, payment_id: str) -> Order | None:
     external_reference = payment_info.get("external_reference")
     if external_reference:
+        group_match = re.match(r"^group_(\d+)_user_(\d+)$", str(external_reference))
+        if group_match:
+            try:
+                group = OrderGroup.objects.get(id=int(group_match.group(1)))
+                return group.orders.first()
+            except OrderGroup.DoesNotExist:
+                pass
         match = re.match(r"^order_(\d+)_user_(\d+)$", str(external_reference))
         if match:
             try:
@@ -41,10 +48,31 @@ def _find_order(payment_info: dict, payment_id: str) -> Order | None:
     pref = payment_info.get("preference_id")
     if pref:
         try:
+            group = OrderGroup.objects.filter(payment_preference_id=pref).first()
+            if group:
+                return group.orders.first()
             return Order.objects.get(payment_preference_id=pref)
         except Order.DoesNotExist:
             pass
     return None
+
+
+def _sync_payment_ids(order, payment_id: str, payment_method: str = ''):
+    if order.order_group_id:
+        group = order.order_group
+        group.payment_id = payment_id
+        if payment_method:
+            group.payment_method = payment_method
+        group.save(update_fields=['payment_id', 'payment_method', 'updated_at'])
+        Order.objects.filter(order_group=group).update(
+            payment_id=payment_id,
+            payment_method=payment_method or group.payment_method,
+        )
+    else:
+        order.payment_id = payment_id
+        if payment_method:
+            order.payment_method = payment_method
+        order.save(update_fields=['payment_id', 'payment_method', 'updated_at'])
 
 
 class PaymentProcessView(APIView):
@@ -66,7 +94,11 @@ class PaymentProcessView(APIView):
         payload = dict(form_data)
         payload["transaction_amount"] = float(order.amount)
         payload["description"] = f"Pedido Galelugi Peças #{order.id}"
-        payload["external_reference"] = f"order_{order.id}_user_{request.user.id}"
+        payload["external_reference"] = (
+            f"group_{order.order_group_id}_user_{request.user.id}"
+            if order.order_group_id
+            else f"order_{order.id}_user_{request.user.id}"
+        )
         payer = payload.get("payer") or {}
         if not isinstance(payer, dict):
             payer = {}
@@ -84,16 +116,18 @@ class PaymentProcessView(APIView):
             return Response({"detail": "Não foi possível processar o pagamento."}, status=status.HTTP_400_BAD_REQUEST)
 
         mp_status = payment.get("status")
-        order.payment_id = str(payment.get("id") or order.payment_id or "")
-        order.payment_method = payment.get("payment_method_id", "") or order.payment_method
+        pm = payment.get("payment_method_id") or order.payment_method
+        _sync_payment_ids(order, str(payment.get("id") or order.payment_id or ""), pm)
         if mp_status == "approved":
             from api.views.shop_views import approve_shop_order
             approve_shop_order(order)
+            order.refresh_from_db()
         elif mp_status in ["rejected", "cancelled", "refunded"]:
-            order.status = OrderStatus.REJECTED
+            from api.views.shop_views import reject_shop_order
+            reject_shop_order(order)
         else:
             order.status = OrderStatus.PENDING
-        order.save()
+            Order.objects.filter(pk=order.pk).update(status=OrderStatus.PENDING)
 
         tx = (payment.get("point_of_interaction") or {}).get("transaction_data") or {}
         return Response({
@@ -128,20 +162,17 @@ class PaymentWebhookView(APIView):
                 return Response({"status": "error"}, status=status.HTTP_404_NOT_FOUND)
 
             mp_status = payment_info.get("status")
-            order.payment_id = str(payment_id)
             pm = payment_info.get("payment_method_id")
-            if pm:
-                order.payment_method = pm
+            _sync_payment_ids(order, str(payment_id), pm or '')
 
             if mp_status == "approved":
                 from api.views.shop_views import approve_shop_order
                 approve_shop_order(order)
-                order.save(update_fields=['payment_id', 'payment_method', 'updated_at'])
             elif mp_status in ["rejected", "cancelled", "refunded"]:
-                order.status = OrderStatus.REJECTED
-                order.save()
+                from api.views.shop_views import reject_shop_order
+                reject_shop_order(order)
             else:
-                order.save()
+                order.save(update_fields=['updated_at'])
 
             return Response({"status": "ok"})
         except Exception as e:
@@ -166,8 +197,9 @@ class PaymentStatusView(APIView):
                     from api.views.shop_views import approve_shop_order
                     approve_shop_order(order)
                 elif mp_status in ["rejected", "cancelled", "refunded"]:
-                    order.status = OrderStatus.REJECTED
-                    order.save()
+                    from api.views.shop_views import reject_shop_order
+                    reject_shop_order(order)
+                    order.save(update_fields=['updated_at'])
 
         return Response(PaymentStatusSerializer({
             "order_id": order.id,

@@ -18,11 +18,15 @@ export default function Manage() {
     brand: '',
     compatible_vehicles: '',
     price: '',
+    cost_price: '',
     stock: '1',
     category: '',
     image_url: '',
     is_featured: false,
     is_active: true,
+    part_condition: 'new',
+    part_origin: 'original',
+    warranty_days: '90',
   });
 
   const loadProducts = () => {
@@ -57,15 +61,18 @@ export default function Manage() {
         body: JSON.stringify({
           ...form,
           price: parseFloat(form.price),
+          cost_price: form.cost_price ? parseFloat(form.cost_price) : null,
           stock: parseInt(form.stock, 10),
           category: form.category || null,
+          warranty_days: parseInt(form.warranty_days, 10) || 0,
         }),
       });
       showToast('Peça cadastrada!');
       setForm({
         name: '', description: '', sku: '', oem_code: '', brand: '',
-        compatible_vehicles: '', price: '', stock: '1', category: '',
+        compatible_vehicles: '', price: '', cost_price: '', stock: '1', category: '',
         image_url: '', is_featured: false, is_active: true,
+        part_condition: 'new', part_origin: 'original', warranty_days: '90',
       });
       loadProducts();
     } catch (error) {
@@ -98,9 +105,9 @@ export default function Manage() {
     <div className="wrap" style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
       <form className="checkout-page" onSubmit={handleSubmit}>
         <h2 style={{ marginBottom: '1rem' }}>Nova peça</h2>
-        {['name', 'sku', 'oem_code', 'brand', 'price', 'stock', 'image_url'].map((field) => (
+        {['name', 'sku', 'oem_code', 'brand', 'price', 'cost_price', 'stock', 'image_url'].map((field) => (
           <div className="form-group" key={field}>
-            <label>{field}</label>
+            <label>{field === 'cost_price' ? 'Custo de aquisição (R$)' : field}</label>
             <input
               value={form[field]}
               onChange={(e) => setForm({ ...form, [field]: e.target.value })}
@@ -126,6 +133,28 @@ export default function Manage() {
             ))}
           </select>
         </div>
+        <div className="form-row-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="form-group">
+            <label>Condição</label>
+            <select value={form.part_condition} onChange={(e) => setForm({ ...form, part_condition: e.target.value })}>
+              <option value="new">Nova</option>
+              <option value="used">Usada</option>
+              <option value="reconditioned">Recondicionada</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Origem</label>
+            <select value={form.part_origin} onChange={(e) => setForm({ ...form, part_origin: e.target.value })}>
+              <option value="original">Original (OEM)</option>
+              <option value="parallel">Paralela</option>
+              <option value="remanufactured">Remanufaturada</option>
+            </select>
+          </div>
+        </div>
+        <div className="form-group">
+          <label>Garantia (dias)</label>
+          <input type="number" min="0" value={form.warranty_days} onChange={(e) => setForm({ ...form, warranty_days: e.target.value })} />
+        </div>
         <div className="form-group">
           <label>Upload foto</label>
           <input type="file" accept="image/*" onChange={handleUpload} />
@@ -143,7 +172,10 @@ export default function Manage() {
             <div>
               <strong>{product.name}</strong>
               <div style={{ color: 'rgba(0,0,0,.55)', fontSize: '0.82rem' }}>
-                {formatCurrency(product.price)} · Est: {product.stock}
+                {formatCurrency(product.price)}
+                {product.cost_price && ` · Custo ${formatCurrency(product.cost_price)}`}
+                {product.margin && ` · Margem ${product.margin.percent}%`}
+                {' · Est: '}{product.stock}
               </div>
             </div>
             <Link to={`/peca/${product.slug}/`} className="btn btn-secondary btn-sm">Ver</Link>

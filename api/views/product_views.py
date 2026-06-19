@@ -1,11 +1,12 @@
 import re
-from django.db.models import Q
+from django.db.models import Q, F
 from django.utils.text import slugify
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.generics import ListAPIView, RetrieveAPIView
-from api.models import Category, Product
+from api.models import Category, Product, User, OrderItem, OrderStatus, ProductReview
+from api.services.stock_reservation_service import get_available_stock, release_expired_reservations
 from api.serializers.product import (
     CategorySerializer,
     ProductListSerializer,
@@ -37,12 +38,16 @@ class ProductListView(ListAPIView):
     serializer_class = ProductListSerializer
 
     def get_queryset(self):
+        release_expired_reservations()
         qs = Product.objects.filter(is_active=True).select_related('category', 'seller')
         q = self.request.query_params.get('q', '').strip()
         category = self.request.query_params.get('category', '').strip()
         brand = self.request.query_params.get('brand', '').strip()
         featured = self.request.query_params.get('featured', '').strip()
         in_stock = self.request.query_params.get('in_stock', '').strip()
+        vehicle_brand = self.request.query_params.get('vehicle_brand', '').strip()
+        vehicle_model = self.request.query_params.get('vehicle_model', '').strip()
+        vehicle_year = self.request.query_params.get('vehicle_year', '').strip()
 
         if q:
             qs = qs.filter(
@@ -59,8 +64,28 @@ class ProductListView(ListAPIView):
             qs = qs.filter(brand__iexact=brand)
         if featured in ('1', 'true', 'yes'):
             qs = qs.filter(is_featured=True)
+        if vehicle_brand:
+            qs = qs.filter(
+                Q(vehicle_compatibilities__vehicle_model__brand__slug=vehicle_brand)
+                | Q(vehicle_compatibilities__vehicle_model__brand__name__iexact=vehicle_brand)
+            )
+        if vehicle_model:
+            qs = qs.filter(
+                Q(vehicle_compatibilities__vehicle_model__slug=vehicle_model)
+                | Q(vehicle_compatibilities__vehicle_model__name__iexact=vehicle_model)
+            )
+        if vehicle_year:
+            try:
+                y = int(vehicle_year)
+                qs = qs.filter(
+                    vehicle_compatibilities__vehicle_model__year_start__lte=y,
+                    vehicle_compatibilities__vehicle_model__year_end__gte=y,
+                )
+            except ValueError:
+                pass
         if in_stock in ('1', 'true', 'yes'):
             qs = qs.filter(stock__gt=0)
+        qs = qs.distinct()
         return qs.order_by('-is_featured', '-created_at')
 
 
@@ -69,6 +94,22 @@ class ProductDetailView(RetrieveAPIView):
     serializer_class = ProductDetailSerializer
     lookup_field = 'slug'
     queryset = Product.objects.filter(is_active=True).select_related('category').prefetch_related('images')
+
+    def retrieve(self, request, *args, **kwargs):
+        response = super().retrieve(request, *args, **kwargs)
+        product = self.get_object()
+        from api.models import ProductViewEvent
+        session_key = request.session.session_key
+        if not session_key:
+            request.session.create()
+            session_key = request.session.session_key or ''
+        ProductViewEvent.objects.create(
+            product=product,
+            user=request.user if request.user.is_authenticated else None,
+            session_key=session_key[:64],
+        )
+        Product.objects.filter(pk=product.pk).update(view_count=F('view_count') + 1)
+        return response
 
 
 class ProductManageListCreateView(APIView):

@@ -57,6 +57,36 @@ from .views.admin_views import (
     painel_logout_api,
     painel_order_detail_api,
     painel_sellers_api,
+    painel_payouts_api,
+    painel_finance_api,
+    painel_invoices_api,
+)
+from .views.marketplace_views import (
+    SellerPayoutSummaryView,
+    SellerPayoutRequestView,
+    SellerOrderListView,
+    SellerOrderDetailView,
+    ProductReviewListView,
+    ProductReviewCreateView,
+    VehicleBrandListView,
+    VehicleModelListView,
+    ReturnRequestListCreateView,
+    ReturnRequestDetailView,
+    SellerReturnListView,
+    ChatConversationListView,
+    ChatStartView,
+    ChatMessagesView,
+    ProductWhatsAppLinkView,
+)
+from .views.growth_views import (
+    NotificationListView,
+    NotificationUnreadCountView,
+    VehicleLookupView,
+    InvoiceRequestListCreateView,
+    InvoiceRequestManageView,
+    SellerAnalyticsView,
+    SellerCsvImportView,
+    SellerCsvTemplateView,
 )
 
 router = DefaultRouter()
@@ -111,6 +141,33 @@ urlpatterns = [
     path('seller/products/<int:pk>/', SellerProductDetailView.as_view(), name='seller-product-detail'),
     path('seller/upload-image/', SellerImageUploadView.as_view(), name='seller-upload-image'),
     path('seller/store/<slug:slug>/', SellerPublicView.as_view(), name='seller-public'),
+    path('seller/payouts/', SellerPayoutSummaryView.as_view(), name='seller-payouts'),
+    path('seller/payouts/request/', SellerPayoutRequestView.as_view(), name='seller-payout-request'),
+    path('seller/orders/', SellerOrderListView.as_view(), name='seller-orders'),
+    path('seller/orders/<int:item_id>/', SellerOrderDetailView.as_view(), name='seller-order-detail'),
+    path('seller/returns/', SellerReturnListView.as_view(), name='seller-returns'),
+
+    # Avaliações, veículos, devoluções, chat
+    path('reviews/', ProductReviewCreateView.as_view(), name='review-create'),
+    path('products/<int:product_id>/reviews/', ProductReviewListView.as_view(), name='product-reviews'),
+    path('vehicles/brands/', VehicleBrandListView.as_view(), name='vehicle-brands'),
+    path('vehicles/models/', VehicleModelListView.as_view(), name='vehicle-models'),
+    path('vehicles/lookup/', VehicleLookupView.as_view(), name='vehicle-lookup'),
+
+    path('notifications/', NotificationListView.as_view(), name='notifications'),
+    path('notifications/unread/', NotificationUnreadCountView.as_view(), name='notifications-unread'),
+    path('invoices/', InvoiceRequestListCreateView.as_view(), name='invoices'),
+    path('invoices/<int:pk>/', InvoiceRequestManageView.as_view(), name='invoice-manage'),
+    path('seller/analytics/', SellerAnalyticsView.as_view(), name='seller-analytics'),
+    path('seller/products/import/', SellerCsvImportView.as_view(), name='seller-csv-import'),
+    path('seller/products/import/template/', SellerCsvTemplateView.as_view(), name='seller-csv-template'),
+
+    path('returns/', ReturnRequestListCreateView.as_view(), name='returns'),
+    path('returns/<int:pk>/', ReturnRequestDetailView.as_view(), name='return-detail'),
+    path('chat/conversations/', ChatConversationListView.as_view(), name='chat-conversations'),
+    path('chat/start/', ChatStartView.as_view(), name='chat-start'),
+    path('chat/<int:conv_id>/messages/', ChatMessagesView.as_view(), name='chat-messages'),
+    path('products/<int:product_id>/whatsapp/', ProductWhatsAppLinkView.as_view(), name='product-whatsapp'),
 
     # Contato
     path('contact/whatsapp/', WhatsAppContactView.as_view(), name='contact-whatsapp'),
@@ -125,4 +182,7 @@ urlpatterns = [
     path('painel/logout', painel_logout_api, name='painel-logout-api'),
     path('painel/orders/<int:order_id>', painel_order_detail_api, name='painel-order-detail-api'),
     path('painel/sellers', painel_sellers_api, name='painel-sellers-api'),
+    path('painel/payouts', painel_payouts_api, name='painel-payouts-api'),
+    path('painel/finance', painel_finance_api, name='painel-finance-api'),
+    path('painel/invoices', painel_invoices_api, name='painel-invoices-api'),
 ]

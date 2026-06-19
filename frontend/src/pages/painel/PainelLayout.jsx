@@ -3,6 +3,9 @@ import { painelApi } from '../../api/client';
 
 const TABS = [
   { to: '/painel/visao', label: 'Visão geral' },
+  { to: '/painel/financeiro', label: 'Lucro' },
+  { to: '/painel/repasses', label: 'Repasses' },
+  { to: '/painel/nfe', label: 'NF-e' },
   { to: '/painel/pedidos', label: 'Pedidos' },
   { to: '/painel/vendedores', label: 'Vendedores' },
   { to: '/painel/config', label: 'Configurações' },

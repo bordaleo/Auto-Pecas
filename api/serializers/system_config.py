@@ -8,7 +8,8 @@ class SystemConfigSerializer(serializers.ModelSerializer):
         fields = [
             'store_name', 'store_tagline', 'store_phone', 'store_whatsapp',
             'store_email', 'store_address', 'free_shipping_min',
-            'marketplace_commission_percent',
+            'marketplace_commission_percent', 'origin_zip', 'melhor_envio_token',
+            'melhor_envio_sandbox', 'stock_reservation_minutes', 'minimum_payout_amount',
             'maintenance_mode', 'maintenance_message',
             'google_analytics_id', 'meta_pixel_id',
             'created_at', 'updated_at',

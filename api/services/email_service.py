@@ -139,5 +139,24 @@ class EmailService:
             _wrap("Carrinho abandonado", body),
         )
 
+    def send_notification_email(
+        self, to_email: str, user_name: str, title: str, body: str, link: str = "",
+    ) -> bool:
+        if not to_email or not self.enabled:
+            return False
+        link_html = ""
+        if link:
+            link_html = (
+                f"<p style='text-align:center;margin-top:20px;'>"
+                f"<a href='{link}' style='background:{ACCENT};color:#fff;padding:12px 24px;"
+                f"text-decoration:none;border-radius:8px;font-weight:700;'>Ver no site</a></p>"
+            )
+        html_body = (
+            f"<p>Olá, <strong>{user_name}</strong>!</p>"
+            f"<p><strong>{title}</strong></p>"
+            f"<p>{body}</p>{link_html}"
+        )
+        return send_email(to_email, f"{title} — {STORE}", _wrap(title, html_body))
+
 
 email_service = EmailService()

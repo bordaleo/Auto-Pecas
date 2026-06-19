@@ -95,6 +95,15 @@ class Seller(models.Model):
         verbose_name='Comissão personalizada (%)',
         help_text='Vazio = usa taxa padrão da plataforma',
     )
+    pix_key = models.CharField(
+        max_length=120, blank=True, default='', verbose_name='Chave PIX para repasse',
+    )
+    balance_available = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name='Saldo disponível',
+    )
+    balance_pending = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name='Saldo pendente (saques)',
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
 
@@ -129,6 +138,18 @@ class ShippingStatus(models.TextChoices):
 class CouponDiscountType(models.TextChoices):
     PERCENT = 'percent', 'Percentual'
     FIXED = 'fixed', 'Valor fixo'
+
+
+class PartCondition(models.TextChoices):
+    NEW = 'new', 'Nova'
+    USED = 'used', 'Usada'
+    RECONDITIONED = 'reconditioned', 'Recondicionada'
+
+
+class PartOrigin(models.TextChoices):
+    ORIGINAL = 'original', 'Original (OEM)'
+    PARALLEL = 'parallel', 'Paralela'
+    REMANUFACTURED = 'remanufactured', 'Remanufaturada'
 
 
 class Category(models.Model):
@@ -174,10 +195,33 @@ class Product(models.Model):
         help_text="Ex: Gol 1.0 2012-2016; Palio 1.4 2010-2015",
     )
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Preço")
+    cost_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        verbose_name="Custo de aquisição",
+        help_text="Usado para calcular margem nas peças da plataforma",
+    )
     compare_at_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Preço anterior"
     )
     stock = models.PositiveIntegerField(default=0, verbose_name="Estoque")
+    weight_kg = models.DecimalField(
+        max_digits=6, decimal_places=3, default=Decimal('1.000'), verbose_name="Peso (kg)",
+    )
+    width_cm = models.PositiveIntegerField(default=20, verbose_name="Largura (cm)")
+    height_cm = models.PositiveIntegerField(default=10, verbose_name="Altura (cm)")
+    length_cm = models.PositiveIntegerField(default=30, verbose_name="Comprimento (cm)")
+    part_condition = models.CharField(
+        max_length=20, choices=PartCondition.choices, default=PartCondition.NEW,
+        verbose_name='Condição',
+    )
+    part_origin = models.CharField(
+        max_length=20, choices=PartOrigin.choices, default=PartOrigin.ORIGINAL,
+        verbose_name='Origem',
+    )
+    warranty_days = models.PositiveIntegerField(
+        default=90, verbose_name='Garantia (dias)',
+    )
+    view_count = models.PositiveIntegerField(default=0, verbose_name='Visualizações')
     image_url = models.URLField(max_length=500, blank=True, default='', verbose_name="Imagem principal")
     is_active = models.BooleanField(default=True, verbose_name="Ativo")
     is_featured = models.BooleanField(default=False, verbose_name="Destaque")
@@ -241,6 +285,31 @@ class ProductImage(models.Model):
         return f"Imagem #{self.id} — {self.product.name}"
 
 
+class OrderGroup(models.Model):
+    """Agrupa sub-pedidos de um checkout (multi-vendedor)."""
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='order_groups', verbose_name='Usuário',
+    )
+    status = models.CharField(
+        max_length=20, choices=OrderStatus.choices, default=OrderStatus.PENDING,
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    coupon_code = models.CharField(max_length=40, blank=True, default='')
+    payment_preference_id = models.CharField(max_length=255, blank=True, default='', db_index=True)
+    payment_id = models.CharField(max_length=255, blank=True, default='', db_index=True)
+    payment_method = models.CharField(max_length=50, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'order_groups'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Grupo #{self.id}'
+
+
 class Order(models.Model):
     """Pedido de compra de autopeças."""
     user = models.ForeignKey(
@@ -248,6 +317,22 @@ class Order(models.Model):
         on_delete=models.CASCADE,
         related_name='orders',
         verbose_name="Usuário"
+    )
+    order_group = models.ForeignKey(
+        OrderGroup,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='orders',
+        verbose_name='Grupo de checkout',
+    )
+    fulfillment_seller = models.ForeignKey(
+        'Seller',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='fulfillment_orders',
+        verbose_name='Loja responsável pelo envio',
     )
     status = models.CharField(
         max_length=20,
@@ -317,6 +402,13 @@ class Order(models.Model):
         verbose_name="Status do envio",
     )
     shipped_at = models.DateTimeField(null=True, blank=True, verbose_name="Enviado em")
+    shipping_service_name = models.CharField(
+        max_length=80, blank=True, default='', verbose_name="Serviço de frete",
+    )
+    shipping_days = models.PositiveIntegerField(null=True, blank=True, verbose_name="Prazo (dias)")
+    shipping_provider = models.CharField(
+        max_length=40, blank=True, default='fixed', verbose_name="Provedor de frete",
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Criado em")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Atualizado em")
 
@@ -374,6 +466,16 @@ class OrderItem(models.Model):
         default=Decimal('0.00'),
         verbose_name='Repasse ao vendedor',
     )
+    item_shipping_status = models.CharField(
+        max_length=20,
+        choices=ShippingStatus.choices,
+        default=ShippingStatus.PENDING,
+        verbose_name='Status envio (vendedor)',
+    )
+    item_tracking_code = models.CharField(max_length=80, blank=True, default='', verbose_name='Rastreio')
+    item_carrier = models.CharField(max_length=80, blank=True, default='', verbose_name='Transportadora')
+    item_shipped_at = models.DateTimeField(null=True, blank=True, verbose_name='Enviado em')
+    seller_balance_credited = models.BooleanField(default=False, verbose_name='Repasse creditado')
 
     class Meta:
         verbose_name = "Item do pedido"
@@ -530,6 +632,20 @@ class SystemConfig(models.Model):
         verbose_name='Comissão do marketplace (%)',
         help_text='Percentual retido pela Galelugi em cada venda de vendedor',
     )
+    origin_zip = models.CharField(
+        max_length=12, blank=True, default='01310100', verbose_name='CEP de origem (frete)',
+    )
+    melhor_envio_token = models.CharField(
+        max_length=255, blank=True, default='', verbose_name='Token Melhor Envio',
+    )
+    melhor_envio_sandbox = models.BooleanField(default=True, verbose_name='Melhor Envio sandbox')
+    stock_reservation_minutes = models.PositiveIntegerField(
+        default=30, verbose_name='Reserva de estoque (minutos)',
+    )
+    minimum_payout_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('50.00'),
+        verbose_name='Saque mínimo vendedor',
+    )
     maintenance_mode = models.BooleanField(default=False, verbose_name="Modo Manutenção")
     maintenance_message = models.TextField(null=True, blank=True, verbose_name="Mensagem de Manutenção")
     google_analytics_id = models.CharField(
@@ -657,4 +773,334 @@ class SiteEngagementTotals(models.Model):
             },
         )
         return row
+
+
+class PayoutStatus(models.TextChoices):
+    PENDING = 'pending', 'Aguardando'
+    PROCESSING = 'processing', 'Em processamento'
+    PAID = 'paid', 'Pago'
+    REJECTED = 'rejected', 'Rejeitado'
+
+
+class SellerPayout(models.Model):
+    """Solicitação de saque do vendedor (repasse manual via PIX)."""
+    seller = models.ForeignKey(
+        Seller, on_delete=models.CASCADE, related_name='payouts', verbose_name='Vendedor',
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Valor')
+    pix_key = models.CharField(max_length=120, verbose_name='Chave PIX')
+    status = models.CharField(
+        max_length=20, choices=PayoutStatus.choices, default=PayoutStatus.PENDING, db_index=True,
+    )
+    admin_notes = models.TextField(blank=True, default='', verbose_name='Notas admin')
+    payment_reference = models.CharField(
+        max_length=120, blank=True, default='', verbose_name='Comprovante / ID PIX',
+    )
+    processed_at = models.DateTimeField(null=True, blank=True, verbose_name='Processado em')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    class Meta:
+        verbose_name = 'Repasse vendedor'
+        verbose_name_plural = 'Repasses vendedores'
+        db_table = 'seller_payouts'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Saque {self.seller.store_name} — R$ {self.amount}'
+
+
+class StockReservation(models.Model):
+    """Reserva temporária de estoque durante checkout pendente."""
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='stock_reservations', verbose_name='Peça',
+    )
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='stock_reservations', verbose_name='Pedido',
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='stock_reservations', verbose_name='Usuário',
+    )
+    quantity = models.PositiveIntegerField(default=1, verbose_name='Quantidade')
+    expires_at = models.DateTimeField(verbose_name='Expira em')
+    released = models.BooleanField(default=False, db_index=True, verbose_name='Liberada')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    class Meta:
+        verbose_name = 'Reserva de estoque'
+        verbose_name_plural = 'Reservas de estoque'
+        db_table = 'stock_reservations'
+        indexes = [models.Index(fields=['product', 'released', 'expires_at'])]
+
+    def __str__(self):
+        return f'Reserva {self.quantity}x {self.product.name}'
+
+
+class VehicleBrand(models.Model):
+    """Marca de veículo para filtro de compatibilidade."""
+    name = models.CharField(max_length=80, unique=True, verbose_name='Marca')
+    slug = models.SlugField(max_length=80, unique=True, db_index=True, verbose_name='Slug')
+    is_active = models.BooleanField(default=True, verbose_name='Ativa')
+
+    class Meta:
+        verbose_name = 'Marca veículo'
+        verbose_name_plural = 'Marcas veículos'
+        db_table = 'vehicle_brands'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class VehicleModel(models.Model):
+    """Modelo de veículo com faixa de anos."""
+    brand = models.ForeignKey(
+        VehicleBrand, on_delete=models.CASCADE, related_name='models', verbose_name='Marca',
+    )
+    name = models.CharField(max_length=120, verbose_name='Modelo')
+    slug = models.SlugField(max_length=120, verbose_name='Slug')
+    year_start = models.PositiveIntegerField(verbose_name='Ano inicial')
+    year_end = models.PositiveIntegerField(verbose_name='Ano final')
+    is_active = models.BooleanField(default=True, verbose_name='Ativo')
+
+    class Meta:
+        verbose_name = 'Modelo veículo'
+        verbose_name_plural = 'Modelos veículos'
+        db_table = 'vehicle_models'
+        ordering = ['brand__name', 'name']
+        unique_together = [['brand', 'slug']]
+
+    def __str__(self):
+        return f'{self.brand.name} {self.name} ({self.year_start}-{self.year_end})'
+
+
+class ProductVehicleCompatibility(models.Model):
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='vehicle_compatibilities', verbose_name='Peça',
+    )
+    vehicle_model = models.ForeignKey(
+        VehicleModel, on_delete=models.CASCADE, related_name='product_links', verbose_name='Veículo',
+    )
+
+    class Meta:
+        verbose_name = 'Compatibilidade veicular'
+        verbose_name_plural = 'Compatibilidades veiculares'
+        db_table = 'product_vehicle_compatibilities'
+        unique_together = [['product', 'vehicle_model']]
+
+    def __str__(self):
+        return f'{self.product.name} → {self.vehicle_model}'
+
+
+class ProductReview(models.Model):
+    """Avaliação de peça por comprador."""
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='reviews', verbose_name='Peça',
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='product_reviews', verbose_name='Usuário',
+    )
+    order_item = models.ForeignKey(
+        OrderItem, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='reviews', verbose_name='Item do pedido',
+    )
+    rating = models.PositiveSmallIntegerField(verbose_name='Nota (1-5)')
+    title = models.CharField(max_length=120, blank=True, default='', verbose_name='Título')
+    comment = models.TextField(blank=True, default='', verbose_name='Comentário')
+    is_verified_purchase = models.BooleanField(default=False, verbose_name='Compra verificada')
+    is_visible = models.BooleanField(default=True, verbose_name='Visível')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    class Meta:
+        verbose_name = 'Avaliação'
+        verbose_name_plural = 'Avaliações'
+        db_table = 'product_reviews'
+        ordering = ['-created_at']
+        unique_together = [['product', 'user', 'order_item']]
+
+    def __str__(self):
+        return f'{self.rating}★ — {self.product.name}'
+
+
+class ReturnStatus(models.TextChoices):
+    REQUESTED = 'requested', 'Solicitada'
+    APPROVED = 'approved', 'Aprovada'
+    REJECTED = 'rejected', 'Rejeitada'
+    ITEM_SHIPPED = 'item_shipped', 'Item enviado pelo cliente'
+    RECEIVED = 'received', 'Item recebido'
+    REFUNDED = 'refunded', 'Reembolsado'
+    CLOSED = 'closed', 'Encerrada'
+
+
+class ReturnRequest(models.Model):
+    """Solicitação de troca/devolução."""
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name='return_requests', verbose_name='Pedido',
+    )
+    order_item = models.ForeignKey(
+        OrderItem, on_delete=models.CASCADE, related_name='return_requests', verbose_name='Item',
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='return_requests', verbose_name='Cliente',
+    )
+    seller = models.ForeignKey(
+        Seller, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='return_requests', verbose_name='Vendedor',
+    )
+    reason = models.CharField(max_length=80, verbose_name='Motivo')
+    description = models.TextField(blank=True, default='', verbose_name='Descrição')
+    status = models.CharField(
+        max_length=20, choices=ReturnStatus.choices, default=ReturnStatus.REQUESTED, db_index=True,
+    )
+    seller_response = models.TextField(blank=True, default='', verbose_name='Resposta vendedor')
+    admin_notes = models.TextField(blank=True, default='', verbose_name='Notas admin')
+    refund_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Valor reembolso',
+    )
+    return_tracking_code = models.CharField(
+        max_length=80, blank=True, default='', verbose_name='Rastreio devolução',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
+
+    class Meta:
+        verbose_name = 'Devolução'
+        verbose_name_plural = 'Devoluções'
+        db_table = 'return_requests'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Devolução #{self.id} — pedido #{self.order_id}'
+
+
+class ProductConversation(models.Model):
+    """Conversa comprador ↔ vendedor sobre uma peça."""
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='conversations', verbose_name='Peça',
+    )
+    buyer = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='product_conversations', verbose_name='Comprador',
+    )
+    seller = models.ForeignKey(
+        Seller, on_delete=models.CASCADE, related_name='conversations', verbose_name='Vendedor',
+    )
+    last_message_at = models.DateTimeField(auto_now_add=True, verbose_name='Última mensagem')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    class Meta:
+        verbose_name = 'Conversa sobre peça'
+        verbose_name_plural = 'Conversas sobre peças'
+        db_table = 'product_conversations'
+        unique_together = [['product', 'buyer']]
+        ordering = ['-last_message_at']
+
+    def __str__(self):
+        return f'Chat {self.product.name} ({self.buyer.email})'
+
+
+class ProductMessage(models.Model):
+    conversation = models.ForeignKey(
+        ProductConversation, on_delete=models.CASCADE, related_name='messages', verbose_name='Conversa',
+    )
+    sender = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='product_messages', verbose_name='Remetente',
+    )
+    body = models.TextField(verbose_name='Mensagem')
+    is_read = models.BooleanField(default=False, verbose_name='Lida')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Enviada em')
+
+    class Meta:
+        verbose_name = 'Mensagem'
+        verbose_name_plural = 'Mensagens'
+        db_table = 'product_messages'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'Msg #{self.id} — {self.sender.email}'
+
+
+class NotificationType(models.TextChoices):
+    ORDER_PAID = 'order_paid', 'Pagamento confirmado'
+    ORDER_SHIPPED = 'order_shipped', 'Pedido enviado'
+    ORDER_TRACKING = 'order_tracking', 'Rastreio atualizado'
+    SELLER_NEW_ORDER = 'seller_new_order', 'Nova venda'
+    CHAT_MESSAGE = 'chat_message', 'Nova mensagem'
+    RETURN_OPENED = 'return_opened', 'Devolução aberta'
+    RETURN_APPROVED = 'return_approved', 'Devolução aprovada'
+    PAYOUT_PAID = 'payout_paid', 'Saque pago'
+    INVOICE_ISSUED = 'invoice_issued', 'Nota fiscal emitida'
+
+
+class UserNotification(models.Model):
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='notifications', verbose_name='Usuário',
+    )
+    notification_type = models.CharField(max_length=40, choices=NotificationType.choices, db_index=True)
+    title = models.CharField(max_length=200)
+    body = models.TextField(blank=True, default='')
+    link = models.CharField(max_length=500, blank=True, default='')
+    is_read = models.BooleanField(default=False, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'user_notifications'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.title} → {self.user.email}'
+
+
+class InvoiceStatus(models.TextChoices):
+    REQUESTED = 'requested', 'Solicitada'
+    PROCESSING = 'processing', 'Em emissão'
+    ISSUED = 'issued', 'Emitida'
+    REJECTED = 'rejected', 'Rejeitada'
+
+
+class InvoiceRequest(models.Model):
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, related_name='invoice_requests', verbose_name='Pedido',
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='invoice_requests', verbose_name='Cliente',
+    )
+    seller = models.ForeignKey(
+        Seller, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='invoice_requests', verbose_name='Vendedor',
+    )
+    cnpj = models.CharField(max_length=20, verbose_name='CNPJ')
+    company_name = models.CharField(max_length=255, verbose_name='Razão social')
+    company_email = models.EmailField(blank=True, default='', verbose_name='E-mail fiscal')
+    status = models.CharField(
+        max_length=20, choices=InvoiceStatus.choices, default=InvoiceStatus.REQUESTED, db_index=True,
+    )
+    invoice_number = models.CharField(max_length=80, blank=True, default='', verbose_name='Número NF-e')
+    invoice_url = models.URLField(max_length=500, blank=True, default='', verbose_name='PDF/XML')
+    admin_notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'invoice_requests'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'NF-e pedido #{self.order_id} — {self.status}'
+
+
+class ProductViewEvent(models.Model):
+    """Registro de visualização para analytics."""
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='view_events', verbose_name='Peça',
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='product_views',
+    )
+    session_key = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'product_view_events'
+        indexes = [models.Index(fields=['product', '-created_at'])]
 

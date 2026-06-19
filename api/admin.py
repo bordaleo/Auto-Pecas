@@ -3,24 +3,33 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from django.urls import reverse
 from .models import (
-    User, Seller, Order, OrderItem, OrderStatus, Category, Product, ProductImage,
+    User, Seller, SellerPayout, Order, OrderGroup, OrderItem, OrderStatus, Category, Product, ProductImage,
     PasswordResetToken, SystemConfig, OpsAlertEvent, SiteEngagementTotals,
-    Coupon, AbandonedCart,
+    Coupon, AbandonedCart, ProductReview, ReturnRequest, VehicleBrand, VehicleModel,
+    ProductConversation, ProductMessage, StockReservation,
+    UserNotification, InvoiceRequest, ProductViewEvent,
 )
 
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
-    readonly_fields = ['product_name', 'product_sku', 'unit_price', 'quantity', 'image_url', 'seller', 'platform_fee', 'seller_earning']
+    readonly_fields = ['product_name', 'product_sku', 'unit_price', 'quantity', 'image_url', 'seller', 'platform_fee', 'seller_earning', 'item_shipping_status', 'item_tracking_code']
 
 
 @admin.register(Seller)
 class SellerAdmin(admin.ModelAdmin):
-    list_display = ['store_name', 'user', 'status', 'commission_rate', 'created_at']
+    list_display = ['store_name', 'user', 'status', 'commission_rate', 'balance_available', 'created_at']
     list_filter = ['status']
     search_fields = ['store_name', 'user__email', 'document']
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = ['balance_available', 'balance_pending', 'created_at', 'updated_at']
+
+
+@admin.register(SellerPayout)
+class SellerPayoutAdmin(admin.ModelAdmin):
+    list_display = ['id', 'seller', 'amount', 'status', 'pix_key', 'created_at', 'processed_at']
+    list_filter = ['status']
+    search_fields = ['seller__store_name', 'pix_key', 'payment_reference']
 
 
 @admin.register(User)
@@ -63,7 +72,7 @@ class ProductImageInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'sku', 'brand', 'price', 'stock', 'is_active', 'is_featured', 'category', 'created_at']
+    list_display = ['name', 'sku', 'brand', 'price', 'cost_price', 'stock', 'is_active', 'is_featured', 'category', 'created_at']
     list_filter = ['is_active', 'is_featured', 'category', 'brand']
     search_fields = ['name', 'sku', 'oem_code', 'brand']
     prepopulated_fields = {'slug': ('name',)}
@@ -101,7 +110,9 @@ class OrderAdmin(admin.ModelAdmin):
     mark_as_approved.short_description = 'Marcar como aprovado'
 
     def mark_as_rejected(self, request, queryset):
-        queryset.update(status=OrderStatus.REJECTED)
+        from api.views.shop_views import reject_shop_order
+        for order in queryset:
+            reject_shop_order(order)
         self.message_user(request, f'{queryset.count()} pedido(s) rejeitado(s).')
     mark_as_rejected.short_description = 'Marcar como rejeitado'
 
@@ -153,6 +164,68 @@ class AbandonedCartAdmin(admin.ModelAdmin):
     list_display = ['email', 'subtotal', 'reminder_sent_at', 'recovered_at', 'updated_at']
     search_fields = ['email']
     readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(ProductReview)
+class ProductReviewAdmin(admin.ModelAdmin):
+    list_display = ['product', 'user', 'rating', 'is_verified_purchase', 'is_visible', 'created_at']
+    list_filter = ['rating', 'is_visible', 'is_verified_purchase']
+
+
+@admin.register(ReturnRequest)
+class ReturnRequestAdmin(admin.ModelAdmin):
+    list_display = ['id', 'order', 'user', 'status', 'reason', 'created_at']
+    list_filter = ['status']
+
+
+@admin.register(VehicleBrand)
+class VehicleBrandAdmin(admin.ModelAdmin):
+    list_display = ['name', 'slug', 'is_active']
+    prepopulated_fields = {'slug': ('name',)}
+
+
+@admin.register(VehicleModel)
+class VehicleModelAdmin(admin.ModelAdmin):
+    list_display = ['brand', 'name', 'year_start', 'year_end', 'is_active']
+    list_filter = ['brand']
+
+
+@admin.register(ProductConversation)
+class ProductConversationAdmin(admin.ModelAdmin):
+    list_display = ['product', 'buyer', 'seller', 'last_message_at']
+
+
+@admin.register(StockReservation)
+class StockReservationAdmin(admin.ModelAdmin):
+    list_display = ['product', 'order', 'quantity', 'expires_at', 'released', 'created_at']
+    list_filter = ['released']
+
+
+@admin.register(OrderGroup)
+class OrderGroupAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user', 'status', 'amount', 'coupon_code', 'created_at']
+    list_filter = ['status']
+    search_fields = ['user__email', 'coupon_code']
+
+
+@admin.register(UserNotification)
+class UserNotificationAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user', 'notification_type', 'title', 'is_read', 'created_at']
+    list_filter = ['notification_type', 'is_read']
+    search_fields = ['user__email', 'title']
+
+
+@admin.register(InvoiceRequest)
+class InvoiceRequestAdmin(admin.ModelAdmin):
+    list_display = ['id', 'order', 'user', 'seller', 'company_name', 'cnpj', 'status', 'created_at']
+    list_filter = ['status']
+    search_fields = ['cnpj', 'company_name', 'user__email', 'invoice_number']
+
+
+@admin.register(ProductViewEvent)
+class ProductViewEventAdmin(admin.ModelAdmin):
+    list_display = ['product', 'user', 'session_key', 'created_at']
+    list_filter = ['created_at']
 
 
 admin.site.site_header = "Galelugi Peças — Administração"

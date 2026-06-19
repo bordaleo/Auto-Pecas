@@ -14,8 +14,13 @@ from api.serializers.shop import (
 )
 from api.services.payment_service import payment_service
 from api.services.email_service import email_service
-from api.services.shipping_service import calculate_shipping_fee, get_pickup_address
+from api.services.shipping_service import get_pickup_address
+from api.services.melhor_envio_service import calculate_shipping_with_provider
 from api.services.marketplace_service import split_sale_amount
+from api.services.checkout_service import build_order_items_from_request, create_orders_from_cart
+from api.services.stock_reservation_service import release_order_reservations
+from api.services.payout_service import credit_seller_earnings_for_order
+from api.services.notification_service import notify_buyer_order_paid, notify_seller_new_order
 from api.services.coupon_service import validate_coupon, apply_coupon_usage
 from api.services.abandoned_cart_service import sync_abandoned_cart, mark_cart_recovered
 import logging
@@ -34,10 +39,12 @@ class ShippingQuoteView(APIView):
 
         data = serializer.validated_data
         config = SystemConfig.get_config()
-        fee, is_free, pickup_address = calculate_shipping_fee(
+        cart_items = data.get('cart_items') or []
+        fee, is_free, pickup_address, meta = calculate_shipping_with_provider(
             data['delivery_method'],
             data['subtotal'],
             data.get('shipping_zip', ''),
+            cart_items=cart_items or None,
         )
         if fee is None:
             return Response({
@@ -56,6 +63,9 @@ class ShippingQuoteView(APIView):
             'free_shipping_min': str(config.free_shipping_min),
             'pickup_address': pickup_address,
             'delivery_method': data['delivery_method'],
+            'shipping_service_name': meta.get('service_name', ''),
+            'shipping_days': meta.get('days'),
+            'shipping_provider': meta.get('provider', 'fixed'),
         })
 
 
@@ -100,7 +110,7 @@ class CartSyncView(APIView):
 
 
 class CheckoutView(APIView):
-    """Cria pedido a partir do carrinho (antes do pagamento)."""
+    """Cria pedido(s) por loja a partir do carrinho (multi-vendedor)."""
     permission_classes = [permissions.IsAuthenticated]
 
     @transaction.atomic
@@ -110,65 +120,14 @@ class CheckoutView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.validated_data
-        subtotal = Decimal('0.00')
-        order_items_data = []
+        try:
+            order_items_data = build_order_items_from_request(data, request.user)
+        except Product.DoesNotExist:
+            return Response({'detail': 'Peça não encontrada.'}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        for item in data['items']:
-            try:
-                product = Product.objects.select_for_update().get(
-                    id=item['product_id'], is_active=True
-                )
-            except Product.DoesNotExist:
-                return Response(
-                    {'detail': f'Peça #{item["product_id"]} não encontrada.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            qty = item['quantity']
-            if product.stock < qty:
-                return Response(
-                    {'detail': f'Estoque insuficiente para "{product.name}". Disponível: {product.stock}.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            line_total = product.price * qty
-            subtotal += line_total
-            line_gross = line_total
-            platform_fee, seller_earning, _ = split_sale_amount(line_gross, product.seller)
-            order_items_data.append({
-                'product': product,
-                'seller': product.seller,
-                'product_name': product.name,
-                'product_sku': product.sku,
-                'unit_price': product.price,
-                'quantity': qty,
-                'image_url': product.image_url,
-                'platform_fee': platform_fee,
-                'seller_earning': seller_earning,
-            })
-
-        delivery_method = data.get('delivery_method', DeliveryMethod.DELIVERY)
-        shipping_fee, _, pickup_address = calculate_shipping_fee(
-            delivery_method,
-            subtotal,
-            data.get('shipping_zip', ''),
-        )
-        if shipping_fee is None:
-            return Response(
-                {'detail': 'CEP inválido para calcular o frete.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        shipping_address = data.get('shipping_address', '')
-        shipping_city = data.get('shipping_city', '')
-        shipping_state = data.get('shipping_state', '')
-        shipping_zip = data.get('shipping_zip', '')
-
-        if delivery_method == DeliveryMethod.PICKUP:
-            shipping_address = pickup_address
-            shipping_city = shipping_city or 'Retirada na loja'
-            shipping_state = shipping_state or 'SP'
-            shipping_zip = shipping_zip or ''
-
-        total = subtotal + shipping_fee
+        subtotal = sum(i['unit_price'] * i['quantity'] for i in order_items_data)
         discount_amount = Decimal('0.00')
         coupon_code = ''
         coupon_obj = None
@@ -182,35 +141,25 @@ class CheckoutView(APIView):
                 coupon_code = coupon_obj.code
             except ValueError as e:
                 return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-            total = max(Decimal('0.01'), total - discount_amount)
 
-        order = Order.objects.create(
-            user=request.user,
-            status=OrderStatus.PENDING,
-            amount=total,
-            shipping_fee=shipping_fee,
-            delivery_method=delivery_method,
-            discount_amount=discount_amount,
-            coupon_code=coupon_code,
-            order_email=data.get('order_email') or request.user.email,
-            customer_name=data['customer_name'],
-            customer_phone=data.get('customer_phone', ''),
-            shipping_address=shipping_address,
-            shipping_city=shipping_city,
-            shipping_state=shipping_state,
-            shipping_zip=shipping_zip,
-            notes=data.get('notes', ''),
-        )
-
-        for item_data in order_items_data:
-            OrderItem.objects.create(order=order, **item_data)
+        try:
+            order_group, orders, primary = create_orders_from_cart(
+                request.user, data, order_items_data, discount_amount, coupon_code,
+            )
+        except ValueError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         if coupon_obj:
             apply_coupon_usage(coupon_obj)
 
         mark_cart_recovered(request.user.email)
 
-        return Response(ShopOrderSerializer(order).data, status=status.HTTP_201_CREATED)
+        payload = ShopOrderSerializer(primary).data
+        payload['order_group_id'] = order_group.id
+        payload['orders_count'] = len(orders)
+        payload['total_amount'] = str(order_group.amount)
+        payload['sub_orders'] = ShopOrderSerializer(orders, many=True).data
+        return Response(payload, status=status.HTTP_201_CREATED)
 
 
 class ShopPaymentPreferenceView(APIView):
@@ -224,50 +173,56 @@ class ShopPaymentPreferenceView(APIView):
 
         order_id = serializer.validated_data['order_id']
         try:
-            order = Order.objects.prefetch_related('items').get(id=order_id, user=request.user)
+            order = Order.objects.prefetch_related('items', 'order_group').get(id=order_id, user=request.user)
         except Order.DoesNotExist:
             return Response({'detail': 'Pedido não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if order.status == OrderStatus.APPROVED:
+        group = order.order_group
+        if group and group.status == OrderStatus.APPROVED:
+            return Response({'detail': 'Pedido já pago.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not group and order.status == OrderStatus.APPROVED:
             return Response({'detail': 'Pedido já pago.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        orders = list(
+            group.orders.prefetch_related('items').all() if group else [order]
+        )
+        pay_amount = group.amount if group else order.amount
+
         items = []
-        items_subtotal = sum(float(item.unit_price) * item.quantity for item in order.items.all())
-        discount = float(order.discount_amount or 0)
-        discount_ratio = (discount / items_subtotal) if items_subtotal > 0 and discount > 0 else 0
+        for sub in orders:
+            seller_label = sub.fulfillment_seller.store_name if sub.fulfillment_seller_id else 'Galelugi'
+            for item in sub.items.all():
+                items.append({
+                    'title': f'[{seller_label}] {item.product_name}'[:256],
+                    'quantity': item.quantity,
+                    'unit_price': float(item.unit_price),
+                })
+            if sub.shipping_fee and sub.shipping_fee > 0:
+                items.append({
+                    'title': f'Frete — {seller_label}'[:256],
+                    'quantity': 1,
+                    'unit_price': float(sub.shipping_fee),
+                })
 
-        for item in order.items.all():
-            unit = float(item.unit_price)
-            if discount_ratio > 0:
-                unit = round(unit * (1 - discount_ratio), 2)
+        if group and group.discount_amount and group.discount_amount > 0:
             items.append({
-                'title': item.product_name[:256],
-                'quantity': item.quantity,
-                'unit_price': unit,
-            })
-
-        if order.shipping_fee and order.shipping_fee > 0:
-            items.append({
-                'title': 'Frete',
+                'title': 'Desconto',
                 'quantity': 1,
-                'unit_price': float(order.shipping_fee),
+                'unit_price': -float(group.discount_amount),
             })
 
-        # Garante que a soma dos itens = valor do pedido (evita 400 no Payment Brick)
         items_total = round(sum(i['quantity'] * i['unit_price'] for i in items), 2)
-        order_total = round(float(order.amount), 2)
+        order_total = round(float(pay_amount), 2)
         diff = round(order_total - items_total, 2)
         if diff != 0:
-            items.append({
-                'title': 'Ajuste',
-                'quantity': 1,
-                'unit_price': diff,
-            })
+            items.append({'title': 'Ajuste', 'quantity': 1, 'unit_price': diff})
 
-        external_reference = f"order_{order.id}_user_{request.user.id}"
+        ref_id = group.id if group else order.id
+        ref_prefix = 'group' if group else 'order'
+        external_reference = f'{ref_prefix}_{ref_id}_user_{request.user.id}'
         preference = payment_service.create_shop_payment_preference(
             items=items,
-            amount=order.amount,
+            amount=pay_amount,
             user_id=request.user.id,
             user_name=order.customer_name or request.user.name,
             user_email=order.order_email or request.user.email,
@@ -280,16 +235,23 @@ class ShopPaymentPreferenceView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        order.payment_preference_id = preference.get('id')
-        order.save(update_fields=['payment_preference_id', 'updated_at'])
+        pref_id = preference.get('id')
+        if group:
+            group.payment_preference_id = pref_id
+            group.save(update_fields=['payment_preference_id', 'updated_at'])
+            Order.objects.filter(order_group=group).update(payment_preference_id=pref_id)
+        else:
+            order.payment_preference_id = pref_id
+            order.save(update_fields=['payment_preference_id', 'updated_at'])
 
         return Response({
-            'preference_id': preference.get('id'),
+            'preference_id': pref_id,
             'init_point': preference.get('init_point'),
             'sandbox_init_point': preference.get('sandbox_init_point'),
             'order_id': order.id,
-            'amount': str(order.amount),
-            'brick_amount': float(order.amount),
+            'order_group_id': group.id if group else None,
+            'amount': str(pay_amount),
+            'brick_amount': float(pay_amount),
         })
 
 
@@ -312,18 +274,57 @@ class ShopOrderDetailView(APIView):
         return Response(ShopOrderSerializer(order).data)
 
 
-def approve_shop_order(order):
-    """Marca pedido como aprovado e decrementa estoque."""
-    if order.status == OrderStatus.APPROVED:
+def _orders_in_payment_scope(order):
+    if order.order_group_id:
+        return list(order.order_group.orders.all())
+    return [order]
+
+
+def reject_shop_order(order):
+    """Rejeita pedido (e grupo) e libera reservas."""
+    for sub in _orders_in_payment_scope(order):
+        if sub.status == OrderStatus.REJECTED:
+            continue
+        sub.status = OrderStatus.REJECTED
+        sub.save(update_fields=['status', 'updated_at'])
+        release_order_reservations(sub.id)
+    if order.order_group_id:
+        from api.models import OrderGroup
+        OrderGroup.objects.filter(pk=order.order_group_id).update(status=OrderStatus.REJECTED)
+
+
+def _approve_single_order(sub):
+    if sub.status == OrderStatus.APPROVED:
         return
+    sub.status = OrderStatus.APPROVED
+    sub.save(update_fields=['status', 'updated_at'])
+    for item in sub.items.select_related('product').all():
+        if item.product_id:
+            product = Product.objects.select_for_update().get(pk=item.product_id)
+            product.stock = max(0, product.stock - item.quantity)
+            product.save(update_fields=['stock', 'updated_at'])
+    credit_seller_earnings_for_order(sub)
+    release_order_reservations(sub.id)
+    if sub.fulfillment_seller_id:
+        item_count = sub.items.count()
+        notify_seller_new_order(sub.fulfillment_seller, sub, item_count)
+
+
+def approve_shop_order(order):
+    """Aprova pedido ou grupo inteiro."""
+    if order.order_group_id and order.order_group.status == OrderStatus.APPROVED:
+        return
+    if not order.order_group_id and order.status == OrderStatus.APPROVED:
+        return
+
     with transaction.atomic():
-        order.status = OrderStatus.APPROVED
-        order.save(update_fields=['status', 'updated_at'])
-        for item in order.items.select_related('product').all():
-            if item.product_id:
-                product = Product.objects.select_for_update().get(pk=item.product_id)
-                product.stock = max(0, product.stock - item.quantity)
-                product.save(update_fields=['stock', 'updated_at'])
+        for sub in _orders_in_payment_scope(order):
+            _approve_single_order(sub)
+        if order.order_group_id:
+            from api.models import OrderGroup
+            OrderGroup.objects.filter(pk=order.order_group_id).update(status=OrderStatus.APPROVED)
+
+    notify_buyer_order_paid(order)
     try:
         email_service.send_order_confirmation(order)
     except Exception as e:

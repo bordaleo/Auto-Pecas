@@ -3,11 +3,17 @@ import { Link, useOutletContext } from 'react-router-dom';
 import { api, formatCurrency, getToken, productList } from '../api/client';
 import { useStore } from '../context/StoreContext';
 import { useToast } from '../context/ToastContext';
+import SellerOrdersPanel from '../components/seller/SellerOrdersPanel';
+import SellerPayoutsPanel from '../components/seller/SellerPayoutsPanel';
+import SellerReturnsPanel from '../components/seller/SellerReturnsPanel';
+import SellerChatPanel from '../components/seller/SellerChatPanel';
+import SellerAnalyticsPanel, { SellerCsvImportPanel, SellerInvoicesPanel } from '../components/seller/SellerAnalyticsPanel';
 
 const EMPTY_FORM = {
   name: '', description: '', sku: '', oem_code: '', brand: '',
   compatible_vehicles: '', price: '', stock: '1', category: '',
-  image_url: '', is_featured: false, is_active: true,
+  image_url: '', is_featured: false, is_active: true, vehicle_brand: '',
+  part_condition: 'new', part_origin: 'original', warranty_days: '90',
 };
 
 export default function SellerHub() {
@@ -22,6 +28,10 @@ export default function SellerHub() {
   const [applyForm, setApplyForm] = useState({ store_name: '', description: '', document: '', phone: '' });
   const [preview, setPreview] = useState(null);
   const [editingId, setEditingId] = useState(null);
+  const [tab, setTab] = useState('products');
+  const [vehicleBrands, setVehicleBrands] = useState([]);
+  const [vehicleModels, setVehicleModels] = useState([]);
+  const [selectedVehicleModels, setSelectedVehicleModels] = useState([]);
 
   const commission = Number(config.marketplace_commission_percent || 12);
 
@@ -44,6 +54,20 @@ export default function SellerHub() {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    api('/vehicles/brands/').then(setVehicleBrands).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!form.vehicle_brand) {
+      setVehicleModels([]);
+      return;
+    }
+    api(`/vehicles/models/?brand=${encodeURIComponent(form.vehicle_brand)}`)
+      .then(setVehicleModels)
+      .catch(() => setVehicleModels([]));
+  }, [form.vehicle_brand]);
 
   useEffect(() => {
     const price = parseFloat(form.price);
@@ -174,7 +198,9 @@ export default function SellerHub() {
             ...form,
             price: parseFloat(form.price),
             stock: parseInt(form.stock, 10),
+            warranty_days: parseInt(form.warranty_days, 10) || 90,
             category: form.category || null,
+            vehicle_model_ids: selectedVehicleModels,
           }),
         });
         showToast('Peça atualizada!');
@@ -186,18 +212,22 @@ export default function SellerHub() {
             ...form,
             price: parseFloat(form.price),
             stock: parseInt(form.stock, 10),
+            warranty_days: parseInt(form.warranty_days, 10) || 90,
             category: form.category || null,
+            vehicle_model_ids: selectedVehicleModels,
           }),
         });
         showToast('Peça publicada!');
       }
       setForm(EMPTY_FORM);
+      setSelectedVehicleModels([]);
       load();
     } catch (err) { showToast(err.message); }
   };
 
   const startEdit = (product) => {
     setEditingId(product.id);
+    setSelectedVehicleModels((product.vehicle_models || []).map((v) => v.id));
     setForm({
       name: product.name || '',
       description: product.description || '',
@@ -242,9 +272,40 @@ export default function SellerHub() {
       <div className="seller-stats">
         <article><strong>{stats.products_active || 0}</strong><span>Peças ativas</span></article>
         <article><strong>{formatCurrency(stats.sales_earnings || 0)}</strong><span>Seu faturamento</span></article>
-        <article><strong>{formatCurrency(stats.sales_gross || 0)}</strong><span>Vendas brutas</span></article>
+        <article><strong>{formatCurrency(seller.balance_available || 0)}</strong><span>Saldo disponível</span></article>
       </div>
 
+      <div className="seller-tabs">
+        {[
+          ['products', 'Peças'],
+          ['orders', 'Pedidos'],
+          ['payouts', 'Repasses'],
+          ['returns', 'Devoluções'],
+          ['chat', 'Mensagens'],
+          ['analytics', 'Analytics'],
+          ['import', 'Importar CSV'],
+          ['invoices', 'NF-e'],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={`seller-tab${tab === key ? ' active' : ''}`}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'orders' && <SellerOrdersPanel />}
+      {tab === 'payouts' && <SellerPayoutsPanel />}
+      {tab === 'returns' && <SellerReturnsPanel />}
+      {tab === 'chat' && <SellerChatPanel />}
+      {tab === 'analytics' && <SellerAnalyticsPanel />}
+      {tab === 'import' && <SellerCsvImportPanel />}
+      {tab === 'invoices' && <SellerInvoicesPanel />}
+
+      {tab === 'products' && (
       <div className="seller-grid">
         <form className="seller-form-card" onSubmit={handleSubmit}>
           <h2>{editingId ? 'Editar peça' : 'Publicar nova peça'}</h2>
@@ -269,6 +330,28 @@ export default function SellerHub() {
               <div className="commission-preview-total"><span>Você recebe</span><strong>{formatCurrency(preview.seller_earning)}</strong></div>
             </div>
           )}
+          <div className="form-row-2">
+            <div className="form-group">
+              <label>Condição</label>
+              <select value={form.part_condition} onChange={(e) => setForm({ ...form, part_condition: e.target.value })}>
+                <option value="new">Nova</option>
+                <option value="used">Usada</option>
+                <option value="reconditioned">Recondicionada</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Origem</label>
+              <select value={form.part_origin} onChange={(e) => setForm({ ...form, part_origin: e.target.value })}>
+                <option value="original">Original (OEM)</option>
+                <option value="parallel">Paralela</option>
+                <option value="remanufactured">Remanufaturada</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Garantia (dias)</label>
+            <input type="number" min="0" value={form.warranty_days} onChange={(e) => setForm({ ...form, warranty_days: e.target.value })} />
+          </div>
           <div className="form-group">
             <label>Marca</label>
             <input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
@@ -291,8 +374,33 @@ export default function SellerHub() {
             </select>
           </div>
           <div className="form-group">
-            <label>Veículos compatíveis</label>
+            <label>Veículos compatíveis (texto livre)</label>
             <textarea rows={2} value={form.compatible_vehicles} onChange={(e) => setForm({ ...form, compatible_vehicles: e.target.value })} />
+          </div>
+          <div className="form-group">
+            <label>Compatibilidade estruturada</label>
+            <select value={form.vehicle_brand || ''} onChange={(e) => setForm({ ...form, vehicle_brand: e.target.value })}>
+              <option value="">Marca do veículo</option>
+              {vehicleBrands.map((b) => <option key={b.id} value={b.slug}>{b.name}</option>)}
+            </select>
+            {vehicleModels.length > 0 && (
+              <div className="vehicle-model-checks">
+                {vehicleModels.map((m) => (
+                  <label key={m.id}>
+                    <input
+                      type="checkbox"
+                      checked={selectedVehicleModels.includes(m.id)}
+                      onChange={(e) => {
+                        setSelectedVehicleModels((prev) => (
+                          e.target.checked ? [...prev, m.id] : prev.filter((id) => id !== m.id)
+                        ));
+                      }}
+                    />
+                    {m.name} ({m.year_start}-{m.year_end})
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
           <div className="form-group">
             <label>Descrição</label>
@@ -343,6 +451,7 @@ export default function SellerHub() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -17,9 +17,9 @@ class SellerMeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Seller
         fields = [
-            'id', 'store_name', 'slug', 'description', 'document', 'phone',
+            'id', 'store_name', 'slug', 'description', 'document', 'phone', 'pix_key',
             'status', 'status_display', 'commission_rate', 'commission_rate_default',
-            'stats', 'created_at',
+            'balance_available', 'balance_pending', 'stats', 'created_at',
         ]
 
     def get_commission_rate_default(self, obj):
