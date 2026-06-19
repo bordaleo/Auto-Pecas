@@ -70,7 +70,12 @@ if getattr(settings, 'SERVE_REACT_SPA', False):
 
     urlpatterns += [
         re_path(r'^assets/(?P<path>.*)$', serve_spa_asset, name='spa-asset'),
-        re_path(r'^(?!api/|admin/|static/|media/|whatsapp/|payment/).*$', serve_spa, name='spa'),
+        path('', serve_spa, name='spa-index'),
+        re_path(
+            r'^(?!api/|admin/|static/|media/|whatsapp/|payment/|health/|assets/).+',
+            serve_spa,
+            name='spa',
+        ),
     ]
 else:
     # Dev: loja React em :3000

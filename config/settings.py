@@ -7,34 +7,35 @@ import dj_database_url
 import cloudinary
 from dotenv import load_dotenv
 
+from config.secrets import cfg, cfg_bool
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIST = BASE_DIR / 'frontend' / 'dist'
-_serve_spa_env = os.getenv('SERVE_REACT_SPA', '').lower() in ('1', 'true', 'yes')
+
+# .env na raiz (local e Render) + credentials.py para segredos sem painel do Render
+env_path = BASE_DIR / '.env'
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path, override=False)
+
+_serve_spa_env = cfg_bool('SERVE_REACT_SPA', False)
 _spa_index = FRONTEND_DIST / 'index.html'
 SERVE_REACT_SPA = _serve_spa_env or (
     bool(os.getenv('RENDER')) and _spa_index.is_file()
 )
-
-# Carrega .env apenas em desenvolvimento (não sobrescreve variáveis do Render/Heroku)
-# No Render, variáveis vêm do Environment; .env não é commitado
-if not os.getenv('RENDER'):
-    env_path = BASE_DIR / '.env'
-    if env_path.exists():
-        load_dotenv(dotenv_path=env_path, override=False)
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-change-in-production')
+SECRET_KEY = cfg('SECRET_KEY', 'django-insecure-dev-key-change-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes')
+DEBUG = cfg_bool('DEBUG', False)
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',') if h.strip()]
+ALLOWED_HOSTS = [h.strip() for h in str(cfg('ALLOWED_HOSTS', '127.0.0.1,localhost')).split(',') if h.strip()]
 _render_host = os.getenv('RENDER_EXTERNAL_HOSTNAME', '').strip()
 if _render_host and _render_host not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(_render_host)
@@ -102,7 +103,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 # PostgreSQL obrigatório - usa dj-database-url (compatível com Render, Heroku, etc.)
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = cfg('DATABASE_URL')
 
 if not DATABASE_URL:
     raise ValueError(
@@ -172,7 +173,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Editor envia fotos em base64 no JSON (hero + polaroids); limite padrão (2,5 MB) quebra no celular
-_DATA_UPLOAD_MB = int(os.getenv('DATA_UPLOAD_MAX_MB', '20'))
+_DATA_UPLOAD_MB = int(cfg('DATA_UPLOAD_MAX_MB', '20'))
 DATA_UPLOAD_MAX_MEMORY_SIZE = _DATA_UPLOAD_MB * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = DATA_UPLOAD_MAX_MEMORY_SIZE
 
@@ -208,7 +209,7 @@ REST_FRAMEWORK = {
 
 # CORS Configuration
 _render_url = os.getenv('RENDER_EXTERNAL_URL', '').strip()
-_cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://127.0.0.1:3000,http://127.0.0.1:8000')
+_cors_origins = cfg('CORS_ALLOWED_ORIGINS', 'http://127.0.0.1:3000,http://127.0.0.1:8000')
 CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_origins.split(',') if o.strip()]
 if _render_url and _render_url not in CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS.append(_render_url)
@@ -217,7 +218,7 @@ if DEBUG:
     CORS_ALLOW_CREDENTIALS = True
 
 # CSRF - necessário para produção com HTTPS
-_csrf_origins = os.getenv('CSRF_TRUSTED_ORIGINS', 'http://127.0.0.1:8000')
+_csrf_origins = cfg('CSRF_TRUSTED_ORIGINS', 'http://127.0.0.1:8000')
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
 if _render_url and _render_url not in CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS.append(_render_url)
@@ -248,7 +249,7 @@ CORS_ALLOW_HEADERS = [
 # JWT Settings
 JWT_SECRET_KEY = SECRET_KEY
 JWT_ALGORITHM = 'HS256'
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '10080'))
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(cfg('ACCESS_TOKEN_EXPIRE_MINUTES', '10080'))
 
 
 # Email Configuration (SMTP)
@@ -281,14 +282,12 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '
 #   SMTP_TIMEOUT=120 (aumentado para evitar timeout)
     
 EMAIL_BACKEND = 'config.email_backends.EmailBackend'
-EMAIL_HOST = os.getenv('SMTP_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.getenv('SMTP_PORT', '587'))
+EMAIL_HOST = cfg('SMTP_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(cfg('SMTP_PORT', '587'))
 
 # Configuração TLS/SSL automática baseada no host
-# Gmail/SendGrid na porta 587 usa TLS, porta 465 usa SSL
-# Brevo: porta 587 (TLS) pode dar timeout no Render, use 465 (SSL) como alternativa
-_smtp_host = os.getenv('SMTP_HOST', '').lower()
-_smtp_use_ssl = os.getenv('SMTP_USE_SSL', '').lower() in ('true', '1', 'yes')
+_smtp_host = str(cfg('SMTP_HOST', '')).lower()
+_smtp_use_ssl = cfg_bool('SMTP_USE_SSL', False)
 
 # Detecção automática para Brevo: se for Brevo e porta 587, tenta usar SSL na porta 465
 if 'brevo' in _smtp_host and EMAIL_PORT == 587 and not _smtp_use_ssl:
@@ -312,30 +311,27 @@ else:
 # IMPORTANTE: No Render, conexões SMTP podem ser bloqueadas. 
 # Se houver timeout, o email será enviado de forma assíncrona para não bloquear o registro.
 # Timeout menor (30s) evita esperar muito tempo quando há bloqueio de rede
-EMAIL_TIMEOUT = int(os.getenv('SMTP_TIMEOUT', '30'))
-EMAIL_HOST_USER = os.getenv('SMTP_USER', None)
-EMAIL_HOST_PASSWORD = os.getenv('SMTP_PASSWORD', None)
-DEFAULT_FROM_EMAIL = os.getenv('SMTP_FROM_EMAIL', EMAIL_HOST_USER or 'suporte.amorlize@gmail.com')
-FRONTEND_URL = os.getenv('FRONTEND_URL') or _render_url or 'http://localhost:3000'
-BACKEND_URL = os.getenv('BACKEND_URL') or _render_url or 'http://localhost:8000'
+EMAIL_TIMEOUT = int(cfg('SMTP_TIMEOUT', '30'))
+EMAIL_HOST_USER = cfg('SMTP_USER', None)
+EMAIL_HOST_PASSWORD = cfg('SMTP_PASSWORD', None)
+DEFAULT_FROM_EMAIL = cfg('SMTP_FROM_EMAIL', EMAIL_HOST_USER or 'suporte.amorlize@gmail.com')
+FRONTEND_URL = cfg('FRONTEND_URL') or _render_url or 'http://localhost:3000'
+BACKEND_URL = cfg('BACKEND_URL') or _render_url or 'http://localhost:8000'
 
 
 # Password Reset
-PASSWORD_RESET_TOKEN_EXPIRE_HOURS = int(os.getenv('PASSWORD_RESET_TOKEN_EXPIRE_HOURS', '24'))
+PASSWORD_RESET_TOKEN_EXPIRE_HOURS = int(cfg('PASSWORD_RESET_TOKEN_EXPIRE_HOURS', '24'))
 
 
 # Mercado Pago Configuration
-MERCADOPAGO_ACCESS_TOKEN = os.getenv('MERCADOPAGO_ACCESS_TOKEN', None)
-MERCADOPAGO_WEBHOOK_SECRET = os.getenv('MERCADOPAGO_WEBHOOK_SECRET', None)
-# Public Key para o frontend (Bricks). Em produção use a chave de PRODUÇÃO para evitar 401 na API de CEP (boleto).
-# Configure via variável de ambiente MERCADOPAGO_PUBLIC_KEY no Render.
-# Public Key de produção: APP_USR-77e67d38-7d72-45f6-900d-43be585effcd
-MERCADOPAGO_PUBLIC_KEY = os.getenv('MERCADOPAGO_PUBLIC_KEY', '') or None
+MERCADOPAGO_ACCESS_TOKEN = cfg('MERCADOPAGO_ACCESS_TOKEN', None)
+MERCADOPAGO_WEBHOOK_SECRET = cfg('MERCADOPAGO_WEBHOOK_SECRET', None)
+MERCADOPAGO_PUBLIC_KEY = cfg('MERCADOPAGO_PUBLIC_KEY', '') or None
 
 # Cloudinary — imagens de produtos
-CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME', None)
-CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY', None)
-CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET', None)
+CLOUDINARY_CLOUD_NAME = cfg('CLOUDINARY_CLOUD_NAME', None)
+CLOUDINARY_API_KEY = cfg('CLOUDINARY_API_KEY', None)
+CLOUDINARY_API_SECRET = cfg('CLOUDINARY_API_SECRET', None)
 
 CLOUDINARY_ENABLED = all([
     CLOUDINARY_CLOUD_NAME,
@@ -343,7 +339,7 @@ CLOUDINARY_ENABLED = all([
     CLOUDINARY_API_SECRET,
 ])
 
-CLOUDINARY_PRODUCTS_PREFIX = os.getenv('CLOUDINARY_PRODUCTS_PREFIX', 'galelugi/products').strip().strip('/')
+CLOUDINARY_PRODUCTS_PREFIX = str(cfg('CLOUDINARY_PRODUCTS_PREFIX', 'galelugi/products')).strip().strip('/')
 
 if CLOUDINARY_ENABLED:
     cloudinary.config(
@@ -374,15 +370,12 @@ if not DEBUG:
 # OPS_ALERT_WEBHOOK_URL: Discord (…/api/webhooks/…), Slack ou URL JSON genérica — definir no Render (segredo).
 # OPS_ALERT_EMAIL: por defeito suporte; override com env.
 # OPS_ALERT_IN_DEBUG=1: também alertar em desenvolvimento (evitar ruído no dia a dia).
-OPS_ALERT_WEBHOOK_URL = os.getenv('OPS_ALERT_WEBHOOK_URL', '').strip()
-OPS_ALERT_EMAIL = os.getenv(
-    'OPS_ALERT_EMAIL',
-    'suporte.amorlize@gmail.com',
-).strip()
-OPS_ALERT_IN_DEBUG = os.getenv('OPS_ALERT_IN_DEBUG', '').lower() in ('1', 'true', 'yes')
+OPS_ALERT_WEBHOOK_URL = str(cfg('OPS_ALERT_WEBHOOK_URL', '')).strip()
+OPS_ALERT_EMAIL = str(cfg('OPS_ALERT_EMAIL', 'suporte.amorlize@gmail.com')).strip()
+OPS_ALERT_IN_DEBUG = cfg_bool('OPS_ALERT_IN_DEBUG', False)
 
-# Senha do painel operacional (/painel/) — sessão; não exige login no site. Override em produção.
-PAINEL_GATE_PASSWORD = os.getenv('PAINEL_GATE_PASSWORD', 'borlaria')
+# Senha do painel operacional (/painel/) — sessão; não exige login no site.
+PAINEL_GATE_PASSWORD = cfg('PAINEL_GATE_PASSWORD', 'borlaria')
 
 LOGGING = {
     'version': 1,
@@ -427,7 +420,7 @@ LOGGING = {
 }
 
 # Sentry (opcional): pip install sentry-sdk; defina SENTRY_DSN no Render.
-_sentry_dsn = os.getenv('SENTRY_DSN', '').strip()
+_sentry_dsn = str(cfg('SENTRY_DSN', '')).strip()
 if _sentry_dsn:
     try:
         import sentry_sdk
@@ -436,9 +429,9 @@ if _sentry_dsn:
         sentry_sdk.init(
             dsn=_sentry_dsn,
             integrations=[DjangoIntegration()],
-            traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE', '0')),
+            traces_sample_rate=float(cfg('SENTRY_TRACES_SAMPLE_RATE', '0')),
             send_default_pii=False,
-            environment=os.getenv('SENTRY_ENVIRONMENT', 'production' if not DEBUG else 'development'),
+            environment=cfg('SENTRY_ENVIRONMENT', 'production' if not DEBUG else 'development'),
         )
     except ImportError:
         import warnings

@@ -1,5 +1,5 @@
 # Render Blueprint - Galelugi Peças
-# API + loja React no MESMO serviço → FRONTEND_URL e BACKEND_URL iguais
+# Config de produção em config/production.py — não precisa preencher Environment no painel.
 
 services:
   - type: web
@@ -11,28 +11,15 @@ services:
       pip install -r requirements.txt
       cd frontend && npm ci && npm run build
       cd ..
-      python manage.py collectstatic --noinput
-      python manage.py migrate --noinput
+      python -c "from pathlib import Path; assert Path('frontend/dist/index.html').is_file(), 'Frontend build falhou'"
+      DJANGO_SETTINGS_MODULE=config.production python manage.py collectstatic --noinput
+      DJANGO_SETTINGS_MODULE=config.production python manage.py migrate --noinput
 
     startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
 
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
-      - key: DEBUG
-        value: "False"
-      - key: SERVE_REACT_SPA
-        value: "true"
-      - key: ALLOWED_HOSTS
-        value: galelugi.com.br,www.galelugi.com.br,galelugi.onrender.com
-      - key: FRONTEND_URL
-        value: https://galelugi.onrender.com
-      - key: BACKEND_URL
-        value: https://galelugi.onrender.com
-      - key: CSRF_TRUSTED_ORIGINS
-        value: https://galelugi.com.br,https://www.galelugi.com.br,https://galelugi.onrender.com
-      - key: CORS_ALLOWED_ORIGINS
-        value: https://galelugi.com.br,https://www.galelugi.com.br,https://galelugi.onrender.com
       - key: DATABASE_URL
         fromDatabase:
           name: galelugi-db
