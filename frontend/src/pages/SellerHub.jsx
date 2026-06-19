@@ -8,11 +8,12 @@ import SellerPayoutsPanel from '../components/seller/SellerPayoutsPanel';
 import SellerReturnsPanel from '../components/seller/SellerReturnsPanel';
 import SellerChatPanel from '../components/seller/SellerChatPanel';
 import SellerAnalyticsPanel, { SellerCsvImportPanel, SellerInvoicesPanel } from '../components/seller/SellerAnalyticsPanel';
+import VehicleCompatibilityPicker from '../components/VehicleCompatibilityPicker';
 
 const EMPTY_FORM = {
   name: '', description: '', sku: '', oem_code: '', brand: '',
-  compatible_vehicles: '', price: '', stock: '1', category: '',
-  image_url: '', is_featured: false, is_active: true, vehicle_brand: '',
+  price: '', stock: '1', category: '',
+  image_url: '', is_featured: false, is_active: true,
   part_condition: 'new', part_origin: 'original', warranty_days: '90',
 };
 
@@ -29,8 +30,6 @@ export default function SellerHub() {
   const [preview, setPreview] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [tab, setTab] = useState('products');
-  const [vehicleBrands, setVehicleBrands] = useState([]);
-  const [vehicleModels, setVehicleModels] = useState([]);
   const [selectedVehicleModels, setSelectedVehicleModels] = useState([]);
 
   const commission = Number(config.marketplace_commission_percent || 12);
@@ -54,20 +53,6 @@ export default function SellerHub() {
   };
 
   useEffect(() => { load(); }, []);
-
-  useEffect(() => {
-    api('/vehicles/brands/').then(setVehicleBrands).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (!form.vehicle_brand) {
-      setVehicleModels([]);
-      return;
-    }
-    api(`/vehicles/models/?brand=${encodeURIComponent(form.vehicle_brand)}`)
-      .then(setVehicleModels)
-      .catch(() => setVehicleModels([]));
-  }, [form.vehicle_brand]);
 
   useEffect(() => {
     const price = parseFloat(form.price);
@@ -190,6 +175,10 @@ export default function SellerHub() {
       showToast('Envie uma foto real da peça antes de publicar.');
       return;
     }
+    if (selectedVehicleModels.length === 0) {
+      showToast('Selecione ao menos um veículo compatível.');
+      return;
+    }
     try {
       if (editingId) {
         await api(`/seller/products/${editingId}/`, {
@@ -227,20 +216,23 @@ export default function SellerHub() {
 
   const startEdit = (product) => {
     setEditingId(product.id);
-    setSelectedVehicleModels((product.vehicle_models || []).map((v) => v.id));
+    const vehicleModels = product.vehicle_models || [];
+    setSelectedVehicleModels(vehicleModels.map((v) => v.id));
     setForm({
       name: product.name || '',
       description: product.description || '',
       sku: product.sku || '',
       oem_code: product.oem_code || '',
       brand: product.brand || '',
-      compatible_vehicles: product.compatible_vehicles || '',
       price: String(product.price || ''),
       stock: String(product.stock || '1'),
       category: product.category?.id || '',
       image_url: product.image_url || '',
       is_featured: product.is_featured || false,
       is_active: product.is_active !== false,
+      part_condition: product.part_condition || 'new',
+      part_origin: product.part_origin || 'original',
+      warranty_days: String(product.warranty_days ?? '90'),
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -373,35 +365,11 @@ export default function SellerHub() {
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          <div className="form-group">
-            <label>Veículos compatíveis (texto livre)</label>
-            <textarea rows={2} value={form.compatible_vehicles} onChange={(e) => setForm({ ...form, compatible_vehicles: e.target.value })} />
-          </div>
-          <div className="form-group">
-            <label>Compatibilidade estruturada</label>
-            <select value={form.vehicle_brand || ''} onChange={(e) => setForm({ ...form, vehicle_brand: e.target.value })}>
-              <option value="">Marca do veículo</option>
-              {vehicleBrands.map((b) => <option key={b.id} value={b.slug}>{b.name}</option>)}
-            </select>
-            {vehicleModels.length > 0 && (
-              <div className="vehicle-model-checks">
-                {vehicleModels.map((m) => (
-                  <label key={m.id}>
-                    <input
-                      type="checkbox"
-                      checked={selectedVehicleModels.includes(m.id)}
-                      onChange={(e) => {
-                        setSelectedVehicleModels((prev) => (
-                          e.target.checked ? [...prev, m.id] : prev.filter((id) => id !== m.id)
-                        ));
-                      }}
-                    />
-                    {m.name} ({m.year_start}-{m.year_end})
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
+          <VehicleCompatibilityPicker
+            selectedIds={selectedVehicleModels}
+            onChange={setSelectedVehicleModels}
+            required
+          />
           <div className="form-group">
             <label>Descrição</label>
             <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
@@ -415,7 +383,7 @@ export default function SellerHub() {
             <input type="file" accept="image/*" onChange={handleUpload} required={!form.image_url} />
           </div>
           {editingId && (
-            <button type="button" className="btn btn-secondary btn-full" style={{ marginBottom: '0.5rem' }} onClick={() => { setEditingId(null); setForm(EMPTY_FORM); }}>
+            <button type="button" className="btn btn-secondary btn-full" style={{ marginBottom: '0.5rem' }} onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setSelectedVehicleModels([]); }}>
               Cancelar edição
             </button>
           )}

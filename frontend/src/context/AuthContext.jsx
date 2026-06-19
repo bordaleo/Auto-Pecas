@@ -63,6 +63,13 @@ export function AuthProvider({ children }) {
     return data;
   }, [refresh]);
 
+  const resendVerification = useCallback(async (email) => {
+    return api('/auth/resend-verification-email', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api('/auth/logout', { method: 'POST' });
@@ -74,8 +81,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, register, verifyEmail, logout, refresh }),
-    [user, loading, login, register, verifyEmail, logout, refresh],
+    () => ({ user, loading, login, register, verifyEmail, resendVerification, logout, refresh }),
+    [user, loading, login, register, verifyEmail, resendVerification, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -3,6 +3,26 @@ import { Link, useOutletContext } from 'react-router-dom';
 import { api, formatCurrency, getToken, productList } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import VehicleCompatibilityPicker from '../components/VehicleCompatibilityPicker';
+import { PRODUCT_FIELD_LABELS, PRODUCT_FORM_FIELDS } from '../constants/productFields';
+
+const EMPTY_FORM = {
+  name: '',
+  description: '',
+  sku: '',
+  oem_code: '',
+  brand: '',
+  price: '',
+  cost_price: '',
+  stock: '1',
+  category: '',
+  image_url: '',
+  is_featured: false,
+  is_active: true,
+  part_condition: 'new',
+  part_origin: 'original',
+  warranty_days: '90',
+};
 
 export default function Manage() {
   const { user } = useAuth();
@@ -10,24 +30,8 @@ export default function Manage() {
   const { openAuth } = useOutletContext();
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
-  const [form, setForm] = useState({
-    name: '',
-    description: '',
-    sku: '',
-    oem_code: '',
-    brand: '',
-    compatible_vehicles: '',
-    price: '',
-    cost_price: '',
-    stock: '1',
-    category: '',
-    image_url: '',
-    is_featured: false,
-    is_active: true,
-    part_condition: 'new',
-    part_origin: 'original',
-    warranty_days: '90',
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [selectedVehicleModels, setSelectedVehicleModels] = useState([]);
 
   const loadProducts = () => {
     api('/manage/products/').then(setProducts).catch(() => setProducts([]));
@@ -55,6 +59,10 @@ export default function Manage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (selectedVehicleModels.length === 0) {
+      showToast('Selecione ao menos um veículo compatível.');
+      return;
+    }
     try {
       await api('/manage/products/', {
         method: 'POST',
@@ -65,15 +73,12 @@ export default function Manage() {
           stock: parseInt(form.stock, 10),
           category: form.category || null,
           warranty_days: parseInt(form.warranty_days, 10) || 0,
+          vehicle_model_ids: selectedVehicleModels,
         }),
       });
       showToast('Peça cadastrada!');
-      setForm({
-        name: '', description: '', sku: '', oem_code: '', brand: '',
-        compatible_vehicles: '', price: '', cost_price: '', stock: '1', category: '',
-        image_url: '', is_featured: false, is_active: true,
-        part_condition: 'new', part_origin: 'original', warranty_days: '90',
-      });
+      setForm(EMPTY_FORM);
+      setSelectedVehicleModels([]);
       loadProducts();
     } catch (error) {
       showToast(error.message);
@@ -105,14 +110,16 @@ export default function Manage() {
     <div className="wrap" style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
       <form className="checkout-page" onSubmit={handleSubmit}>
         <h2 style={{ marginBottom: '1rem' }}>Nova peça</h2>
-        {['name', 'sku', 'oem_code', 'brand', 'price', 'cost_price', 'stock', 'image_url'].map((field) => (
+        {PRODUCT_FORM_FIELDS.map((field) => (
           <div className="form-group" key={field}>
-            <label>{field === 'cost_price' ? 'Custo de aquisição (R$)' : field}</label>
+            <label>{PRODUCT_FIELD_LABELS[field]}</label>
             <input
               value={form[field]}
               onChange={(e) => setForm({ ...form, [field]: e.target.value })}
               required={['name', 'price', 'stock'].includes(field)}
-              type={field === 'price' || field === 'stock' ? 'number' : 'text'}
+              type={field === 'price' || field === 'cost_price' || field === 'stock' ? 'number' : 'text'}
+              step={field === 'price' || field === 'cost_price' ? '0.01' : undefined}
+              min={field === 'stock' ? '0' : undefined}
             />
           </div>
         ))}
@@ -120,14 +127,15 @@ export default function Manage() {
           <label>Descrição</label>
           <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </div>
-        <div className="form-group">
-          <label>Veículos compatíveis</label>
-          <textarea rows={2} value={form.compatible_vehicles} onChange={(e) => setForm({ ...form, compatible_vehicles: e.target.value })} />
-        </div>
+        <VehicleCompatibilityPicker
+          selectedIds={selectedVehicleModels}
+          onChange={setSelectedVehicleModels}
+          required
+        />
         <div className="form-group">
           <label>Categoria</label>
           <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-            <option value="">—</option>
+            <option value="">Selecione uma categoria</option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
@@ -156,7 +164,7 @@ export default function Manage() {
           <input type="number" min="0" value={form.warranty_days} onChange={(e) => setForm({ ...form, warranty_days: e.target.value })} />
         </div>
         <div className="form-group">
-          <label>Upload foto</label>
+          <label>Enviar foto</label>
           <input type="file" accept="image/*" onChange={handleUpload} />
         </div>
         <label><input type="checkbox" checked={form.is_featured} onChange={(e) => setForm({ ...form, is_featured: e.target.checked })} /> Destaque</label>

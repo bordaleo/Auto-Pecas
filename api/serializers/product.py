@@ -117,6 +117,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
                 'id': l.vehicle_model_id,
                 'name': l.vehicle_model.name,
                 'brand': l.vehicle_model.brand.name,
+                'brand_slug': l.vehicle_model.brand.slug,
                 'year_start': l.vehicle_model.year_start,
                 'year_end': l.vehicle_model.year_end,
             }
@@ -196,9 +197,21 @@ class ProductWriteSerializer(serializers.ModelSerializer):
     def _sync_vehicle_models(self, product, model_ids):
         if model_ids is None:
             return
+        from api.models import VehicleModel
         ProductVehicleCompatibility.objects.filter(product=product).delete()
+        labels = []
         for mid in model_ids:
             ProductVehicleCompatibility.objects.get_or_create(product=product, vehicle_model_id=mid)
+            try:
+                model = VehicleModel.objects.select_related('brand').get(pk=mid)
+                labels.append(
+                    f"{model.brand.name} {model.name} ({model.year_start}-{model.year_end})"
+                )
+            except VehicleModel.DoesNotExist:
+                continue
+        if labels:
+            product.compatible_vehicles = ', '.join(labels)
+            product.save(update_fields=['compatible_vehicles', 'updated_at'])
 
     def create(self, validated_data):
         extra_images = validated_data.pop('extra_images', [])

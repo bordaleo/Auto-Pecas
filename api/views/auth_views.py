@@ -24,7 +24,7 @@ from django.conf import settings
 logger = __import__('logging').getLogger(__name__)
 
 
-def generate_unique_verification_code(model_class, length=6, max_retries=20):
+def generate_unique_verification_code(model_class, length=4, max_retries=20):
     """Gera um código numérico único para o model informado."""
     for _ in range(max_retries):
         code = ''.join(str(random.randint(0, 9)) for _ in range(length))

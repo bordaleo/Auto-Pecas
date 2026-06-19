@@ -48,15 +48,40 @@ class EmailService:
             f"<p>Use o código abaixo para redefinir sua senha:</p>{_code_block(reset_code)}"
             f"<p><strong>Válido por 24 horas.</strong> Se não foi você, ignore este email.</p>"
         )
-        return send_email(to_email, f"Recuperação de senha — {STORE}", _wrap("Recuperação de senha", body))
+        plain = (
+            f"Olá, {user_name}!\n\n"
+            f"Seu código para redefinir a senha na {STORE} é: {reset_code}\n\n"
+            f"Válido por 24 horas. Se não foi você, ignore este email."
+        )
+        return send_email(
+            to_email,
+            f"Código {reset_code} — redefinir senha {STORE}",
+            _wrap("Recuperação de senha", body),
+            text_content=plain,
+            tags=["password-reset", "transactional"],
+        )
 
     def _send_verification_email_sync(self, to_email: str, verification_code: str, user_name: str) -> bool:
         body = (
             f"<p>Olá, <strong>{user_name}</strong>!</p>"
-            f"<p>Confirme seu cadastro com o código:</p>{_code_block(verification_code)}"
+            f"<p>Seu código para ativar a conta na {STORE}:</p>{_code_block(verification_code)}"
             f"<p><strong>Válido por 24 horas.</strong></p>"
+            f"<p style='font-size:13px;color:#64748b;'>"
+            f"Não encontrou o email? Verifique a pasta de spam ou lixo eletrônico.</p>"
         )
-        return send_email(to_email, f"Verifique sua conta — {STORE}", _wrap("Verificação de conta", body))
+        plain = (
+            f"Olá, {user_name}!\n\n"
+            f"Seu código para ativar a conta na {STORE} é: {verification_code}\n\n"
+            f"Válido por 24 horas.\n\n"
+            f"Não encontrou este email? Verifique a pasta de spam ou lixo eletrônico."
+        )
+        return send_email(
+            to_email,
+            f"Código {verification_code} — ative sua conta {STORE}",
+            _wrap("Ative sua conta", body),
+            text_content=plain,
+            tags=["account-verification", "transactional"],
+        )
 
     def send_verification_email(self, to_email: str, verification_code: str, user_name: str, async_send: bool = True) -> bool:
         if not self.enabled:

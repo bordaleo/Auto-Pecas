@@ -53,7 +53,10 @@ class VerifyEmailSerializer(serializers.Serializer):
         if not code:
             raise serializers.ValidationError({"code": "Código de verificação é obrigatório"})
 
-        attrs['code'] = str(code).strip()
+        code = str(code).strip()
+        if not code.isdigit() or len(code) != 4:
+            raise serializers.ValidationError({"code": "Informe o código de 4 dígitos enviado por email."})
+        attrs['code'] = code
         return attrs
 
 

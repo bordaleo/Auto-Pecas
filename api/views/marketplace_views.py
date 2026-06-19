@@ -212,7 +212,7 @@ class VehicleModelListView(APIView):
                 qs = qs.filter(year_start__lte=y, year_end__gte=y)
             except ValueError:
                 pass
-        return Response(VehicleModelSerializer(qs.order_by('brand__name', 'name')[:200], many=True).data)
+        return Response(VehicleModelSerializer(qs.order_by('brand__name', 'name')[:500], many=True).data)
 
 
 class ReturnRequestListCreateView(APIView):

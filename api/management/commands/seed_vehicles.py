@@ -6,64 +6,64 @@ from api.models import VehicleBrand, VehicleModel
 
 VEHICLES = [
     ('Volkswagen', [
-        ('Gol', 2008, 2024),
+        ('Gol', 2008, 2026),
         ('Polo', 2010, 2026),
-        ('Virtus', 2018, 2024),
-        ('T-Cross', 2019, 2024),
-        ('Amarok', 2010, 2024),
+        ('Virtus', 2018, 2026),
+        ('T-Cross', 2019, 2026),
+        ('Amarok', 2010, 2026),
     ]),
     ('Fiat', [
-        ('Uno', 2010, 2024),
+        ('Uno', 2010, 2026),
         ('Palio', 2010, 2017),
-        ('Argo', 2017, 2024),
-        ('Cronos', 2018, 2024),
-        ('Strada', 2010, 2024),
-        ('Toro', 2016, 2024),
+        ('Argo', 2017, 2026),
+        ('Cronos', 2018, 2026),
+        ('Strada', 2010, 2026),
+        ('Toro', 2016, 2026),
     ]),
     ('Chevrolet', [
-        ('Onix', 2012, 2024),
+        ('Onix', 2012, 2026),
         ('Prisma', 2013, 2019),
-        ('Tracker', 2020, 2024),
-        ('S10', 2010, 2024),
+        ('Tracker', 2020, 2026),
+        ('S10', 2010, 2026),
         ('Cruze', 2011, 2023),
     ]),
     ('Ford', [
         ('Ka', 2010, 2021),
         ('Fiesta', 2010, 2019),
         ('EcoSport', 2010, 2022),
-        ('Ranger', 2010, 2024),
+        ('Ranger', 2010, 2026),
         ('Focus', 2010, 2019),
     ]),
     ('Hyundai', [
-        ('HB20', 2012, 2024),
-        ('Creta', 2017, 2024),
-        ('Tucson', 2010, 2024),
+        ('HB20', 2012, 2026),
+        ('Creta', 2017, 2026),
+        ('Tucson', 2010, 2026),
     ]),
     ('Toyota', [
-        ('Corolla', 2010, 2024),
-        ('Hilux', 2010, 2024),
-        ('Yaris', 2018, 2024),
+        ('Corolla', 2010, 2026),
+        ('Hilux', 2010, 2026),
+        ('Yaris', 2018, 2026),
     ]),
     ('Honda', [
-        ('Civic', 2010, 2024),
-        ('City', 2010, 2024),
-        ('HR-V', 2015, 2024),
+        ('Civic', 2010, 2026),
+        ('City', 2010, 2026),
+        ('HR-V', 2015, 2026),
         ('Fit', 2010, 2020),
     ]),
     ('Renault', [
-        ('Sandero', 2010, 2024),
-        ('Logan', 2010, 2024),
-        ('Duster', 2011, 2024),
-        ('Kwid', 2017, 2024),
+        ('Sandero', 2010, 2026),
+        ('Logan', 2010, 2026),
+        ('Duster', 2011, 2026),
+        ('Kwid', 2017, 2026),
     ]),
     ('Jeep', [
-        ('Renegade', 2015, 2024),
-        ('Compass', 2017, 2024),
+        ('Renegade', 2015, 2026),
+        ('Compass', 2017, 2026),
     ]),
     ('Nissan', [
-        ('March', 2011, 2024),
-        ('Kicks', 2017, 2024),
-        ('Frontier', 2010, 2024),
+        ('March', 2011, 2026),
+        ('Kicks', 2017, 2026),
+        ('Frontier', 2010, 2026),
     ]),
 ]
 
@@ -84,7 +84,7 @@ class Command(BaseCommand):
                 created_brands += 1
             for model_name, y_start, y_end in models:
                 mslug = slugify(model_name)
-                _, m_created = VehicleModel.objects.get_or_create(
+                obj, m_created = VehicleModel.objects.update_or_create(
                     brand=brand,
                     slug=mslug,
                     defaults={

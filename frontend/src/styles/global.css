@@ -1391,7 +1391,31 @@ button, input, select, textarea { font: inherit; }
 }
 .seller-tab.active { background: var(--gl-midnight); color: #fff; border-color: var(--gl-midnight); }
 .seller-order-card { padding: 1rem; border: 1px solid var(--gl-border); border-radius: var(--gl-radius-sm); background: #fff; margin-bottom: 1rem; }
-.vehicle-model-checks { display: grid; gap: 0.35rem; margin-top: 0.5rem; max-height: 180px; overflow: auto; }
+.vehicle-model-checks { display: grid; gap: 0.35rem; margin-top: 0.5rem; max-height: 220px; overflow: auto; padding: 0.5rem; border: 1px solid var(--gl-border); border-radius: 8px; background: #fafafa; }
+.vehicle-model-option { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
+.vehicle-compat-picker .field-hint { font-size: 0.82rem; color: rgba(0,0,0,.55); margin: 0 0 0.5rem; }
+.vehicle-compat-picker .field-hint-warn { color: #b45309; }
+.vehicle-compat-toolbar { display: grid; grid-template-columns: 1fr 180px; gap: 0.75rem; margin-bottom: 0.75rem; }
+.vehicle-brand-list { display: grid; gap: 0.5rem; max-height: 360px; overflow: auto; }
+.vehicle-brand-section { border: 1px solid var(--gl-border); border-radius: 10px; overflow: hidden; background: #fff; }
+.vehicle-brand-header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0.85rem; border: none; background: #f8fafc; cursor: pointer; font-weight: 700; font-size: 0.92rem; text-align: left; }
+.vehicle-brand-count { margin-left: 0.5rem; font-size: 0.75rem; font-weight: 600; color: var(--gl-accent); }
+.vehicle-brand-toggle { font-size: 1.1rem; color: #64748b; }
+.vehicle-brand-actions { display: flex; gap: 0.75rem; padding: 0.35rem 0.85rem 0; }
+.vehicle-model-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); border: none; background: transparent; max-height: none; }
+.vehicle-model-option small { color: rgba(0,0,0,.45); font-size: 0.78rem; }
+.vehicle-selected-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
+.vehicle-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.5rem; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 999px; font-size: 0.78rem; }
+.vehicle-chip button { border: none; background: transparent; cursor: pointer; font-size: 1rem; line-height: 1; color: #64748b; }
+.auth-modal { max-width: 420px; }
+.auth-step-hint { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gl-accent); margin-bottom: 0.75rem; font-weight: 700; }
+.auth-verify-intro { text-align: center; font-size: 0.92rem; color: rgba(0,0,0,.65); margin-bottom: 1rem; line-height: 1.5; }
+.auth-spam-hint { font-size: 0.82rem; color: rgba(0,0,0,.55); text-align: center; margin: 0.75rem 0 1rem; }
+.btn-link { background: none; border: none; color: var(--gl-accent); cursor: pointer; padding: 0; font: inherit; text-decoration: underline; }
+.btn-link:disabled { opacity: 0.5; cursor: not-allowed; text-decoration: none; }
+.otp-inputs { display: flex; gap: 0.6rem; justify-content: center; margin: 0.5rem 0 0.25rem; }
+.otp-inputs input { width: 3.25rem; height: 3.5rem; text-align: center; font-size: 1.6rem; font-weight: 700; border: 2px solid var(--gl-border); border-radius: 10px; }
+.otp-inputs input:focus { border-color: var(--gl-accent); outline: none; box-shadow: 0 0 0 3px rgba(232,93,4,.15); }
 .product-reviews { margin: 2rem 0 3rem; }
 .product-reviews-wrap { margin-top: 0.5rem; margin-bottom: 2.5rem; }
 .review-layout { display: grid; grid-template-columns: 240px 1fr; gap: 1.5rem; }
