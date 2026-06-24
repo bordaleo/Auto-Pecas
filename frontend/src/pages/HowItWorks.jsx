@@ -70,7 +70,7 @@ export default function HowItWorks() {
             <li>Preview do valor líquido antes de publicar</li>
             <li>Foto real obrigatória em cada anúncio</li>
           </ul>
-          <Link to="/vender/" className="btn btn-secondary">Começar a vender</Link>
+          <Link to="/venda-conosco/" className="btn btn-secondary">Começar a vender</Link>
         </article>
       </section>
 

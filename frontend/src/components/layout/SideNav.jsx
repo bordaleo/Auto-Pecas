@@ -17,7 +17,8 @@ const HELP_LINKS = [
 
 const ACCOUNT_LINKS = [
   { to: '/pedidos/', label: 'Meus pedidos', icon: 'box' },
-  { to: '/vender/', label: 'Vender na Galelugi', icon: 'store', accent: true },
+  { to: '/venda-conosco/', label: 'Venda conosco', icon: 'store', accent: true },
+  { to: '/vender/', label: 'Minha loja', icon: 'store' },
 ];
 
 function NavIcon({ name }) {

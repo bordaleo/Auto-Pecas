@@ -19,6 +19,13 @@ from api.serializers import (
 )
 from api.authentication.jwt import create_access_token
 from api.services.email_service import email_service
+from api.throttling import (
+    AuthEmailTargetThrottle,
+    AuthLoginThrottle,
+    AuthPasswordThrottle,
+    AuthRegisterThrottle,
+    AuthVerifyThrottle,
+)
 from django.conf import settings
 
 logger = __import__('logging').getLogger(__name__)
@@ -36,6 +43,7 @@ def generate_unique_verification_code(model_class, length=4, max_retries=20):
 class RegisterView(APIView):
     """View para registro de novo usuário"""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRegisterThrottle, AuthEmailTargetThrottle]
     
     def post(self, request):
         try:
@@ -159,9 +167,13 @@ class RegisterView(APIView):
 class LoginView(APIView):
     """View para login - retorna token JWT"""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthLoginThrottle]
     
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+        from api.utils_auth import resolve_login_email
+        payload = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        payload['email'] = resolve_login_email(payload.get('email', ''))
+        serializer = LoginSerializer(data=payload)
         if not serializer.is_valid():
             logger.warning(f"Login falhou - Erros de validação: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -326,6 +338,7 @@ class UpdateProfileView(APIView):
 class ForgotPasswordView(APIView):
     """View para solicitar recuperação de senha"""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthPasswordThrottle, AuthEmailTargetThrottle]
     
     def post(self, request):
         serializer = ForgotPasswordSerializer(data=request.data)
@@ -380,6 +393,7 @@ class ForgotPasswordView(APIView):
 class VerifyPasswordResetCodeView(APIView):
     """View para validar código de recuperação de senha"""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthVerifyThrottle]
 
     def post(self, request):
         serializer = VerifyEmailSerializer(data=request.data)
@@ -409,6 +423,7 @@ class VerifyPasswordResetCodeView(APIView):
 class ResetPasswordView(APIView):
     """View para redefinir senha usando código"""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthVerifyThrottle]
     
     def post(self, request):
         serializer = ResetPasswordSerializer(data=request.data)
@@ -452,6 +467,7 @@ class ResetPasswordView(APIView):
 class VerifyEmailView(APIView):
     """View para verificar email usando código"""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthVerifyThrottle]
     
     def post(self, request):
         serializer = VerifyEmailSerializer(data=request.data)
@@ -509,6 +525,7 @@ class VerifyEmailView(APIView):
 class ResendVerificationEmailView(APIView):
     """View para reenviar email de verificação"""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthPasswordThrottle, AuthEmailTargetThrottle]
     
     def post(self, request):
         serializer = ResendVerificationEmailSerializer(data=request.data)

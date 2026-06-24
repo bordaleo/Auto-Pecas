@@ -1,86 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
-import { api } from '../api/client';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import OtpInput, { OTP_LENGTH } from './OtpInput';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
-const OTP_LENGTH = 4;
 const RESEND_COOLDOWN = 60;
-
-function OtpInput({ value, onChange, onComplete }) {
-  const inputsRef = useRef([]);
-
-  const digits = value.padEnd(OTP_LENGTH, ' ').split('').slice(0, OTP_LENGTH);
-
-  const updateAt = (index, char) => {
-    const next = digits.map((d, i) => (i === index ? char : d)).join('').replace(/ /g, '');
-    onChange(next.slice(0, OTP_LENGTH));
-    if (char && index < OTP_LENGTH - 1) {
-      inputsRef.current[index + 1]?.focus();
-    }
-    if (next.length === OTP_LENGTH) {
-      onComplete?.(next);
-    }
-  };
-
-  const handleChange = (index, event) => {
-    const raw = event.target.value.replace(/\D/g, '');
-    if (!raw) {
-      updateAt(index, '');
-      return;
-    }
-    if (raw.length > 1) {
-      const merged = `${value}${raw}`.replace(/\D/g, '').slice(0, OTP_LENGTH);
-      onChange(merged);
-      const focusIndex = Math.min(merged.length, OTP_LENGTH - 1);
-      inputsRef.current[focusIndex]?.focus();
-      if (merged.length === OTP_LENGTH) onComplete?.(merged);
-      return;
-    }
-    updateAt(index, raw);
-  };
-
-  const handleKeyDown = (index, event) => {
-    if (event.key === 'Backspace' && !digits[index]?.trim() && index > 0) {
-      inputsRef.current[index - 1]?.focus();
-    }
-  };
-
-  const handlePaste = (event) => {
-    event.preventDefault();
-    const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, OTP_LENGTH);
-    onChange(pasted);
-    if (pasted.length === OTP_LENGTH) onComplete?.(pasted);
-    inputsRef.current[Math.min(pasted.length, OTP_LENGTH - 1)]?.focus();
-  };
-
-  return (
-    <div className="otp-inputs" onPaste={handlePaste}>
-      {digits.map((digit, index) => (
-        <input
-          key={index}
-          ref={(el) => { inputsRef.current[index] = el; }}
-          type="text"
-          inputMode="numeric"
-          autoComplete={index === 0 ? 'one-time-code' : 'off'}
-          maxLength={1}
-          value={digit.trim()}
-          aria-label={`Dígito ${index + 1}`}
-          onChange={(e) => handleChange(index, e)}
-          onKeyDown={(e) => handleKeyDown(index, e)}
-        />
-      ))}
-    </div>
-  );
-}
 
 export default function AuthModal({ open, tab: initialTab, onClose, onTabChange }) {
   const [tab, setTab] = useState(initialTab || 'login');
   const [message, setMessage] = useState({ text: '', error: false });
   const [pendingEmail, setPendingEmail] = useState(localStorage.getItem('pending_verify_email') || '');
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetStep, setResetStep] = useState('email');
   const [otpCode, setOtpCode] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [resendSeconds, setResendSeconds] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const { login, register, verifyEmail, resendVerification } = useAuth();
+  const { login, register, verifyEmail, resendVerification, forgotPassword, resetPassword } = useAuth();
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -100,6 +38,10 @@ export default function AuthModal({ open, tab: initialTab, onClose, onTabChange 
     onTabChange?.(next);
     setMessage({ text: '', error: false });
     setOtpCode('');
+    setResetOtp('');
+    setNewPassword('');
+    setNewPasswordConfirm('');
+    if (next !== 'reset') setResetStep('email');
   };
 
   const handleLogin = async (event) => {
@@ -194,15 +136,72 @@ export default function AuthModal({ open, tab: initialTab, onClose, onTabChange 
     }
   };
 
-  const handleForgot = async () => {
-    const email = document.querySelector('#login-email')?.value;
-    if (!email) {
-      setMessage({ text: 'Informe seu email', error: true });
+  const startReset = () => {
+    const email = document.querySelector('#login-email')?.value || '';
+    setResetEmail(email);
+    setResetStep('email');
+    switchTab('reset');
+  };
+
+  const sendResetCode = async (event) => {
+    event.preventDefault();
+    if (!resetEmail.trim()) {
+      setMessage({ text: 'Informe seu email.', error: true });
       return;
     }
+    setSubmitting(true);
     try {
-      await api('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
-      showToast('Código enviado! Verifique também o spam.');
+      await forgotPassword(resetEmail.trim());
+      setResendSeconds(RESEND_COOLDOWN);
+      setResetStep('confirm');
+      setMessage({
+        text: 'Se o email estiver cadastrado, você receberá um código. Verifique também o spam.',
+        error: false,
+      });
+    } catch (error) {
+      setMessage({ text: error.message, error: true });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitPasswordReset = async (codeOverride) => {
+    const code = (codeOverride || resetOtp).trim();
+    if (code.length !== OTP_LENGTH) {
+      setMessage({ text: 'Digite os 4 dígitos do código.', error: true });
+      return;
+    }
+    if (newPassword.length < 6) {
+      setMessage({ text: 'A senha deve ter no mínimo 6 caracteres.', error: true });
+      return;
+    }
+    if (newPassword !== newPasswordConfirm) {
+      setMessage({ text: 'As senhas não coincidem.', error: true });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await resetPassword(code, newPassword, newPasswordConfirm);
+      onClose();
+      showToast('Senha redefinida! Bem-vindo de volta.');
+    } catch (error) {
+      setMessage({ text: error.message, error: true });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResetSubmit = async (event) => {
+    event.preventDefault();
+    await submitPasswordReset();
+  };
+
+  const handleResetResend = async () => {
+    if (!resetEmail.trim() || resendSeconds > 0) return;
+    try {
+      await forgotPassword(resetEmail.trim());
+      setResendSeconds(RESEND_COOLDOWN);
+      setMessage({ text: 'Novo código enviado.', error: false });
     } catch (error) {
       setMessage({ text: error.message, error: true });
     }
@@ -215,15 +214,22 @@ export default function AuthModal({ open, tab: initialTab, onClose, onTabChange 
           <strong>
             {tab === 'register' && 'Criar conta'}
             {tab === 'verify' && 'Confirme seu email'}
+            {tab === 'reset' && 'Redefinir senha'}
             {tab === 'login' && 'Entre na sua conta'}
           </strong>
           <button type="button" className="btn-ghost" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
-          {tab !== 'verify' && (
+          {tab === 'login' && (
             <div className="tabs">
-              <button type="button" className={`tab${tab === 'login' ? ' active' : ''}`} onClick={() => switchTab('login')}>Entrar</button>
-              <button type="button" className={`tab${tab === 'register' ? ' active' : ''}`} onClick={() => switchTab('register')}>Criar conta</button>
+              <button type="button" className="tab active">Entrar</button>
+              <button type="button" className="tab" onClick={() => switchTab('register')}>Criar conta</button>
+            </div>
+          )}
+          {tab === 'register' && (
+            <div className="tabs">
+              <button type="button" className="tab" onClick={() => switchTab('login')}>Entrar</button>
+              <button type="button" className="tab active">Criar conta</button>
             </div>
           )}
 
@@ -237,7 +243,7 @@ export default function AuthModal({ open, tab: initialTab, onClose, onTabChange 
                 <label htmlFor="login-password">Senha</label>
                 <input id="login-password" name="password" type="password" required />
               </div>
-              <button type="button" className="btn-ghost btn-sm" onClick={handleForgot} style={{ marginBottom: '1rem' }}>
+              <button type="button" className="btn-ghost btn-sm" onClick={startReset} style={{ marginBottom: '0.5rem' }}>
                 Esqueci minha senha
               </button>
               <button type="submit" className="btn btn-primary btn-full">Entrar</button>
@@ -278,21 +284,12 @@ export default function AuthModal({ open, tab: initialTab, onClose, onTabChange 
               </p>
               <div className="form-group">
                 <label>Digite o código</label>
-                <OtpInput
-                  value={otpCode}
-                  onChange={setOtpCode}
-                  onComplete={submitVerification}
-                />
+                <OtpInput value={otpCode} onChange={setOtpCode} onComplete={submitVerification} />
               </div>
               <p className="auth-spam-hint">
                 Não recebeu? Verifique spam ou lixo eletrônico.
                 {' '}
-                <button
-                  type="button"
-                  className="btn-link"
-                  disabled={resendSeconds > 0}
-                  onClick={handleResend}
-                >
+                <button type="button" className="btn-link" disabled={resendSeconds > 0} onClick={handleResend}>
                   {resendSeconds > 0 ? `Reenviar em ${resendSeconds}s` : 'Reenviar código'}
                 </button>
               </p>
@@ -305,8 +302,82 @@ export default function AuthModal({ open, tab: initialTab, onClose, onTabChange 
             </form>
           )}
 
+          {tab === 'reset' && resetStep === 'email' && (
+            <form onSubmit={sendResetCode}>
+              <p className="auth-step-hint">Passo 1 de 2 — seu email</p>
+              <div className="form-group">
+                <label htmlFor="reset-modal-email">Email da conta</label>
+                <input
+                  id="reset-modal-email"
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <button type="submit" className="btn btn-primary btn-full" disabled={submitting}>
+                {submitting ? 'Enviando...' : 'Enviar código'}
+              </button>
+              <button type="button" className="btn btn-ghost btn-full" style={{ marginTop: '0.5rem' }} onClick={() => switchTab('login')}>
+                Voltar ao login
+              </button>
+            </form>
+          )}
+
+          {tab === 'reset' && resetStep === 'confirm' && (
+            <form onSubmit={handleResetSubmit}>
+              <p className="auth-step-hint">Passo 2 de 2 — nova senha</p>
+              <p className="auth-verify-intro">
+                Código enviado para <strong>{resetEmail}</strong>
+              </p>
+              <div className="form-group">
+                <label>Código</label>
+                <OtpInput value={resetOtp} onChange={setResetOtp} onComplete={submitPasswordReset} />
+              </div>
+              <div className="form-group">
+                <label htmlFor="modal-new-password">Nova senha</label>
+                <input
+                  id="modal-new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  minLength={6}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="modal-new-confirm">Confirmar senha</label>
+                <input
+                  id="modal-new-confirm"
+                  type="password"
+                  value={newPasswordConfirm}
+                  onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                  minLength={6}
+                  required
+                />
+              </div>
+              <p className="auth-spam-hint">
+                <button type="button" className="btn-link" disabled={resendSeconds > 0} onClick={handleResetResend}>
+                  {resendSeconds > 0 ? `Reenviar em ${resendSeconds}s` : 'Reenviar código'}
+                </button>
+              </p>
+              <button type="submit" className="btn btn-primary btn-full" disabled={submitting || resetOtp.length !== OTP_LENGTH}>
+                {submitting ? 'Salvando...' : 'Redefinir senha'}
+              </button>
+              <button type="button" className="btn btn-ghost btn-full" style={{ marginTop: '0.5rem' }} onClick={() => setResetStep('email')}>
+                Voltar
+              </button>
+            </form>
+          )}
+
           {message.text && (
             <p className={`form-msg${message.error ? ' error' : ' ok'}`}>{message.text}</p>
+          )}
+
+          {tab === 'login' && (
+            <p className="auth-spam-hint" style={{ marginTop: '0.75rem' }}>
+              Ou acesse <Link to="/reset-password" onClick={onClose}>a página de recuperação</Link>.
+            </p>
           )}
         </div>
       </div>

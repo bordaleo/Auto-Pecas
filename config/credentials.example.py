@@ -31,5 +31,23 @@ BREVO_API_KEY = ''
 
 PAINEL_GATE_PASSWORD = 'troque-esta-senha'
 
-# Opcional — frete real via Melhor Envio (sandbox ou produção)
+# Nuvem Fiscal — NF-e (https://console.nuvemfiscal.com.br)
+NUVEM_FISCAL_CLIENT_ID = ''
+NUVEM_FISCAL_CLIENT_SECRET = ''
+NUVEM_FISCAL_SANDBOX = True
+NUVEM_FISCAL_EMITTER_CNPJ = ''
+NUVEM_FISCAL_EMITTER_CPF = ''
+NUVEM_FISCAL_EMITTER_UF = 'SP'
+NUVEM_FISCAL_EMITTER_CITY_IBGE = '3550308'
+NUVEM_FISCAL_DEFAULT_NCM = '87089990'
+NUVEM_FISCAL_CRT = '1'
+NUVEM_FISCAL_CFOP = '5102'
+NUVEM_FISCAL_MOCK = False
+
+# Melhor Envio — frete (https://docs.melhorenvio.com.br)
+# Após criar o app na Área Dev, use as URLs abaixo no cadastro (HTTPS obrigatório).
+# Callback: {BACKEND_URL}/api/v1/integrations/melhor-envio/callback/
+MELHOR_ENVIO_CLIENT_ID = ''
+MELHOR_ENVIO_CLIENT_SECRET = ''
 MELHOR_ENVIO_TOKEN = ''
+MELHOR_ENVIO_CALLBACK_BASE = 'https://galelugi.onrender.com'

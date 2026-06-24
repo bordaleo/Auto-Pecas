@@ -26,7 +26,15 @@ export default function SellerHub() {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [applyForm, setApplyForm] = useState({ store_name: '', description: '', document: '', phone: '' });
+  const [applyForm, setApplyForm] = useState({
+    store_name: '', description: '', document: '', phone: '',
+    origin_zip: '', shipping_address: '', shipping_city: '', shipping_state: '',
+    estimated_stock_units: '',
+  });
+  const [shippingForm, setShippingForm] = useState({
+    origin_zip: '', shipping_address: '', shipping_city: '', shipping_state: '',
+    ships_from_platform: false,
+  });
   const [preview, setPreview] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [tab, setTab] = useState('products');
@@ -39,6 +47,13 @@ export default function SellerHub() {
     try {
       const me = await api('/seller/me/');
       setSeller(me);
+      setShippingForm({
+        origin_zip: me.origin_zip || '',
+        shipping_address: me.shipping_address || '',
+        shipping_city: me.shipping_city || '',
+        shipping_state: me.shipping_state || '',
+        ships_from_platform: Boolean(me.ships_from_platform),
+      });
       const [cats, prods] = await Promise.all([
         api('/categories/'),
         api('/seller/products/'),
@@ -91,6 +106,9 @@ export default function SellerHub() {
           <div className="seller-hero-card">
             <span className="eyebrow">Abra sua loja</span>
             <h1>Comece a vender na Galelugi</h1>
+            <p className="seller-fast-approval">
+              Aprovação rápida — analisamos sua loja em até 1 dia útil e você recebe por e-mail quando estiver ativa.
+            </p>
             <ul className="seller-benefits">
               <li>Publique peças em minutos</li>
               <li>Alcance compradores em todo o país</li>
@@ -100,14 +118,26 @@ export default function SellerHub() {
           </div>
           <form className="seller-form-card" onSubmit={async (e) => {
             e.preventDefault();
+            const stock = parseInt(applyForm.estimated_stock_units, 10);
+            if (!stock || stock < 1) {
+              showToast('Informe quantas peças você tem em estoque (aproximado).');
+              return;
+            }
             try {
-              const data = await api('/seller/apply/', { method: 'POST', body: JSON.stringify(applyForm) });
+              const data = await api('/seller/apply/', {
+                method: 'POST',
+                body: JSON.stringify({
+                  ...applyForm,
+                  estimated_stock_units: stock,
+                }),
+              });
               setSeller(data);
-              showToast('Loja cadastrada!');
+              showToast('Solicitação enviada! Aprovação rápida — em breve você poderá vender.');
               load();
             } catch (err) { showToast(err.message); }
           }}>
             <h2>Cadastrar loja</h2>
+            <p className="form-hint">Preencha com dados reais. Usamos essas informações para calcular frete e aprovar sua loja.</p>
             <div className="form-group">
               <label>Nome da loja *</label>
               <input value={applyForm.store_name} onChange={(e) => setApplyForm({ ...applyForm, store_name: e.target.value })} required />
@@ -119,6 +149,36 @@ export default function SellerHub() {
             <div className="form-group">
               <label>Telefone / WhatsApp</label>
               <input value={applyForm.phone} onChange={(e) => setApplyForm({ ...applyForm, phone: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label>CEP de origem (frete)</label>
+              <input value={applyForm.origin_zip} onChange={(e) => setApplyForm({ ...applyForm, origin_zip: e.target.value })} placeholder="00000-000" />
+            </div>
+            <div className="form-group">
+              <label>Endereço de envio</label>
+              <input value={applyForm.shipping_address} onChange={(e) => setApplyForm({ ...applyForm, shipping_address: e.target.value })} />
+            </div>
+            <div className="form-row-2">
+              <div className="form-group">
+                <label>Cidade</label>
+                <input value={applyForm.shipping_city} onChange={(e) => setApplyForm({ ...applyForm, shipping_city: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>UF</label>
+                <input maxLength={2} value={applyForm.shipping_state} onChange={(e) => setApplyForm({ ...applyForm, shipping_state: e.target.value.toUpperCase() })} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Quantidade de peças em estoque (aprox.) *</label>
+              <input
+                type="number"
+                min="1"
+                required
+                value={applyForm.estimated_stock_units}
+                onChange={(e) => setApplyForm({ ...applyForm, estimated_stock_units: e.target.value })}
+                placeholder="Ex.: 150"
+              />
+              <small className="form-hint">Total de itens que você pretende vender na plataforma.</small>
             </div>
             <div className="form-group">
               <label>Sobre sua loja</label>
@@ -137,8 +197,23 @@ export default function SellerHub() {
         <div className="seller-hero-card">
           <span className="eyebrow">Aguardando análise</span>
           <h1>Sua loja <em>{seller.store_name}</em> está em revisão</h1>
-          <p>Em breve você poderá publicar peças. Enquanto isso, complete seu perfil em Minha conta.</p>
+          <p>
+            Aprovação rápida — em geral no mesmo dia útil. Você receberá acesso completo assim que aprovada.
+            {seller.estimated_stock_units ? ` Estoque informado: ~${seller.estimated_stock_units} peças.` : ''}
+          </p>
           <Link to="/perfil/" className="btn btn-secondary">Ir para minha conta</Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (seller.status === 'rejected') {
+    return (
+      <div className="wrap seller-hub">
+        <div className="seller-hero-card">
+          <span className="eyebrow">Solicitação não aprovada</span>
+          <h1>Loja <em>{seller.store_name}</em></h1>
+          <p>Entre em contato pelo WhatsApp se quiser mais detalhes ou enviar uma nova solicitação.</p>
         </div>
       </div>
     );
@@ -255,7 +330,10 @@ export default function SellerHub() {
       <div className="seller-dash-head">
         <div>
           <span className="eyebrow">Minha loja</span>
-          <h1>{seller.store_name}</h1>
+          <h1>
+            {seller.store_name}
+            {seller.is_official && <span className="store-badge store-badge--lg">Oficial</span>}
+          </h1>
           <p>Comissão Galelugi: <strong>{seller.commission_rate_default || commission}%</strong> por venda</p>
         </div>
         <Link to={`/loja/${seller.slug}/`} className="btn btn-secondary">Ver vitrine pública</Link>
@@ -270,6 +348,7 @@ export default function SellerHub() {
       <div className="seller-tabs">
         {[
           ['products', 'Peças'],
+          ['shipping', 'Frete e endereço'],
           ['orders', 'Pedidos'],
           ['payouts', 'Repasses'],
           ['returns', 'Devoluções'],
@@ -296,6 +375,77 @@ export default function SellerHub() {
       {tab === 'analytics' && <SellerAnalyticsPanel />}
       {tab === 'import' && <SellerCsvImportPanel />}
       {tab === 'invoices' && <SellerInvoicesPanel />}
+
+      {tab === 'shipping' && (
+        <form
+          className="seller-form-card"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              const data = await api('/seller/me/', {
+                method: 'PATCH',
+                body: JSON.stringify(shippingForm),
+              });
+              setSeller(data);
+              showToast('Endereço de envio atualizado!');
+            } catch (err) {
+              showToast(err.message);
+            }
+          }}
+        >
+          <h2>Frete e endereço de origem</h2>
+          <p className="form-hint">
+            O frete do cliente é calculado a partir do CEP informado abaixo,
+            ou do endereço da Sandroni se você usar envio pela plataforma.
+          </p>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={shippingForm.ships_from_platform}
+              onChange={(e) => setShippingForm({ ...shippingForm, ships_from_platform: e.target.checked })}
+            />
+            <span>Envio pela Auto Peças Sandroni (consignação — peça sai do endereço da loja oficial)</span>
+          </label>
+          {!shippingForm.ships_from_platform && (
+            <>
+              <div className="form-group">
+                <label>CEP de origem *</label>
+                <input
+                  value={shippingForm.origin_zip}
+                  onChange={(e) => setShippingForm({ ...shippingForm, origin_zip: e.target.value })}
+                  placeholder="00000-000"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Endereço</label>
+                <input
+                  value={shippingForm.shipping_address}
+                  onChange={(e) => setShippingForm({ ...shippingForm, shipping_address: e.target.value })}
+                />
+              </div>
+              <div className="form-row-2">
+                <div className="form-group">
+                  <label>Cidade</label>
+                  <input
+                    value={shippingForm.shipping_city}
+                    onChange={(e) => setShippingForm({ ...shippingForm, shipping_city: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>UF</label>
+                  <input
+                    maxLength={2}
+                    value={shippingForm.shipping_state}
+                    onChange={(e) => setShippingForm({ ...shippingForm, shipping_state: e.target.value.toUpperCase() })}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+          <button type="submit" className="btn btn-accent">Salvar configurações de frete</button>
+        </form>
+      )}
 
       {tab === 'products' && (
       <div className="seller-grid">

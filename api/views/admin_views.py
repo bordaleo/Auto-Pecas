@@ -282,6 +282,25 @@ def painel_session_api(request):
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
 def painel_login_api(request):
+    from api.utils_auth import resolve_login_email
+
+    email = resolve_login_email((request.data.get("email") or "").strip())
+    password = (request.data.get("password") or "").strip()
+
+    if email and password:
+        try:
+            user = User.objects.get(email=User.objects.normalize_email(email), is_active=True)
+        except User.DoesNotExist:
+            return Response({"detail": "Email ou senha incorretos."}, status=status.HTTP_403_FORBIDDEN)
+        if not user.check_password(password):
+            return Response({"detail": "Email ou senha incorretos."}, status=status.HTTP_403_FORBIDDEN)
+        if not (user.is_staff or user.is_superuser):
+            return Response({"detail": "Sem permissão de administrador."}, status=status.HTTP_403_FORBIDDEN)
+        request.session[PAINEL_SESSION_KEY] = True
+        request.session["painel_staff_id"] = user.id
+        request.session.set_expiry(60 * 60 * 12)
+        return Response({"ok": True, "email": user.email})
+
     password = (request.data.get("password") or "").strip()
     expected = (getattr(settings, "PAINEL_GATE_PASSWORD", None) or "").strip()
     if not expected:
@@ -349,33 +368,87 @@ def painel_sellers_api(request):
         return Response({"detail": "Não autorizado."}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "GET":
-        sellers = Seller.objects.select_related("user").order_by("-created_at")[:100]
+        status_filter = (request.GET.get("status") or "").strip()
+        qs = Seller.objects.select_related("user").order_by("-created_at")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        sellers = qs[:100]
         rows = [
             {
                 "id": s.id,
                 "store_name": s.store_name,
                 "slug": s.slug,
+                "description": s.description,
                 "status": s.status,
+                "status_display": s.get_status_display(),
                 "document": s.document,
                 "phone": s.phone,
+                "estimated_stock_units": s.estimated_stock_units,
                 "user_email": s.user.email,
+                "user_name": s.user.name,
+                "user_phone": s.user.phone,
+                "origin_zip": s.origin_zip,
+                "shipping_address": s.shipping_address,
+                "shipping_city": s.shipping_city,
+                "shipping_state": s.shipping_state,
+                "ships_from_platform": s.ships_from_platform,
+                "is_official": s.is_official,
+                "admin_notes": s.admin_notes,
+                "pix_key": s.pix_key,
                 "created_at": s.created_at.isoformat(),
             }
             for s in sellers
         ]
-        return Response({"results": rows})
+        pending_count = Seller.objects.filter(status=Seller.Status.PENDING).count()
+        return Response({"results": rows, "pending_count": pending_count})
 
     seller_id = request.data.get("id")
     new_status = request.data.get("status")
-    if not seller_id or new_status not in {Seller.Status.ACTIVE, Seller.Status.SUSPENDED, Seller.Status.PENDING}:
+    is_official = request.data.get("is_official")
+    ships_from_platform = request.data.get("ships_from_platform")
+    admin_notes = request.data.get("admin_notes")
+
+    if not seller_id:
         return Response({"detail": "Dados inválidos."}, status=status.HTTP_400_BAD_REQUEST)
+
+    allowed_status = {
+        Seller.Status.ACTIVE,
+        Seller.Status.SUSPENDED,
+        Seller.Status.PENDING,
+        Seller.Status.REJECTED,
+    }
+    if new_status and new_status not in allowed_status:
+        return Response({"detail": "Status inválido."}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
         seller = Seller.objects.get(pk=seller_id)
     except Seller.DoesNotExist:
         return Response({"detail": "Vendedor não encontrado."}, status=status.HTTP_404_NOT_FOUND)
-    seller.status = new_status
-    seller.save(update_fields=["status", "updated_at"])
-    return Response({"ok": True, "id": seller.id, "status": seller.status})
+
+    update_fields = ["updated_at"]
+    if new_status:
+        seller.status = new_status
+        update_fields.append("status")
+    if is_official is not None:
+        if is_official:
+            Seller.objects.filter(is_official=True).exclude(pk=seller.pk).update(is_official=False)
+        seller.is_official = bool(is_official)
+        update_fields.append("is_official")
+    if ships_from_platform is not None:
+        seller.ships_from_platform = bool(ships_from_platform)
+        update_fields.append("ships_from_platform")
+    if admin_notes is not None:
+        seller.admin_notes = str(admin_notes)
+        update_fields.append("admin_notes")
+
+    seller.save(update_fields=update_fields)
+    return Response({
+        "ok": True,
+        "id": seller.id,
+        "status": seller.status,
+        "is_official": seller.is_official,
+        "ships_from_platform": seller.ships_from_platform,
+    })
 
 
 @api_view(["GET", "PATCH"])
@@ -438,7 +511,8 @@ def painel_invoices_api(request):
         return Response({"detail": "Não autorizado."}, status=status.HTTP_403_FORBIDDEN)
 
     from api.models import InvoiceRequest, InvoiceStatus
-    from api.services.notification_service import notify_invoice_issued
+    from api.services.invoice_service import apply_invoice_update
+    from api.utils import format_cnpj
 
     if request.method == "GET":
         status_filter = (request.query_params.get("status") or "").strip()
@@ -453,12 +527,16 @@ def painel_invoices_api(request):
                     "user_email": r.user.email,
                     "seller_name": r.seller.store_name if r.seller_id else "Galelugi Peças",
                     "cnpj": r.cnpj,
+                    "cnpj_formatted": format_cnpj(r.cnpj),
                     "company_name": r.company_name,
                     "company_email": r.company_email,
                     "status": r.status,
                     "status_display": r.get_status_display(),
                     "invoice_number": r.invoice_number,
                     "invoice_url": r.invoice_url,
+                    "nuvem_fiscal_id": r.nuvem_fiscal_id,
+                    "nuvem_fiscal_status": r.nuvem_fiscal_status,
+                    "nuvem_fiscal_chave": r.nuvem_fiscal_chave,
                     "admin_notes": r.admin_notes,
                     "created_at": r.created_at.isoformat(),
                 }
@@ -472,18 +550,8 @@ def painel_invoices_api(request):
     except InvoiceRequest.DoesNotExist:
         return Response({"detail": "Solicitação não encontrada."}, status=status.HTTP_404_NOT_FOUND)
 
-    new_status = request.data.get("status")
-    if new_status in dict(InvoiceStatus.choices):
-        inv.status = new_status
-    if "invoice_number" in request.data:
-        inv.invoice_number = (request.data.get("invoice_number") or "").strip()
-    if "invoice_url" in request.data:
-        inv.invoice_url = (request.data.get("invoice_url") or "").strip()
-    if "admin_notes" in request.data:
-        inv.admin_notes = (request.data.get("admin_notes") or "").strip()
-    inv.save()
-
-    if inv.status == InvoiceStatus.ISSUED:
-        notify_invoice_issued(inv.user, inv)
+    error = apply_invoice_update(inv, request.data)
+    if error:
+        return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response({"ok": True, "id": inv.id, "status": inv.status})

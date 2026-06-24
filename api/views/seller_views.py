@@ -8,7 +8,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from api.models import Product, Seller, OrderStatus
 from api.permissions.seller import IsActiveSeller, get_seller_for_user
-from api.serializers.seller import SellerApplySerializer, SellerMeSerializer, SellerPublicSerializer
+from api.serializers.seller import (
+    SellerApplySerializer,
+    SellerMeSerializer,
+    SellerProfileUpdateSerializer,
+    SellerPublicSerializer,
+)
 from api.serializers.product import ProductDetailSerializer, ProductWriteSerializer, ProductImageUploadSerializer
 from api.services.cloudinary_service import upload_image_if_needed
 from api.services.marketplace_service import seller_dashboard_stats, get_commission_rate, split_sale_amount
@@ -43,6 +48,18 @@ class SellerMeView(APIView):
         seller = get_seller_for_user(request.user)
         if not seller:
             return Response({'detail': 'Você ainda não é vendedor.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(SellerMeSerializer(seller).data)
+
+    def patch(self, request):
+        seller = get_seller_for_user(request.user)
+        if not seller:
+            return Response({'detail': 'Você ainda não é vendedor.'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = SellerProfileUpdateSerializer(data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        for key, value in serializer.validated_data.items():
+            setattr(seller, key, value)
+        seller.save()
         return Response(SellerMeSerializer(seller).data)
 
 

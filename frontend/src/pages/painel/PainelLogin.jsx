@@ -4,6 +4,7 @@ import { painelApi } from '../../api/client';
 
 export default function PainelLogin() {
   const navigate = useNavigate();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -11,7 +12,7 @@ export default function PainelLogin() {
   useEffect(() => {
     painelApi('/painel/session')
       .then((data) => {
-        if (data.authenticated) navigate('/painel/visao/', { replace: true });
+        if (data.authenticated) navigate('/painel/vendedores/', { replace: true });
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -23,9 +24,9 @@ export default function PainelLogin() {
     try {
       await painelApi('/painel/login', {
         method: 'POST',
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email, password }),
       });
-      navigate('/painel/visao/', { replace: true });
+      navigate('/painel/vendedores/', { replace: true });
     } catch (err) {
       setError(err.message);
     }
@@ -37,16 +38,28 @@ export default function PainelLogin() {
     <div className="painel-login">
       <form className="painel-login-card" onSubmit={submit}>
         <h1>Painel Galelugi</h1>
-        <p>Acesso operacional da loja</p>
+        <p>Acesso administrativo — aprovar vendedores e operar a loja</p>
+        <input
+          type="text"
+          placeholder="E-mail ou usuário (ex.: admin)"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="username"
+          required
+        />
         <input
           type="password"
-          placeholder="Senha do painel"
+          placeholder="Senha"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
           required
         />
         {error && <p className="painel-error">{error}</p>}
         <button type="submit" className="btn btn-accent btn-full">Entrar</button>
+        <p className="form-hint" style={{ marginTop: '0.75rem', fontSize: '0.82rem' }}>
+          Conta padrão: <strong>admin</strong> · senha <strong>admin</strong>
+        </p>
       </form>
     </div>
   );

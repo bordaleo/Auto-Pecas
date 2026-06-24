@@ -28,8 +28,10 @@ class ProductListSerializer(serializers.ModelSerializer):
     category_slug = serializers.CharField(source='category.slug', read_only=True, default='')
     in_stock = serializers.SerializerMethodField()
     available_stock = serializers.SerializerMethodField()
-    seller_name = serializers.CharField(source='seller.store_name', read_only=True, default='')
-    seller_slug = serializers.CharField(source='seller.slug', read_only=True, default='')
+    seller_name = serializers.SerializerMethodField()
+    seller_slug = serializers.SerializerMethodField()
+    seller_is_official = serializers.SerializerMethodField()
+    seller_ships_from_platform = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
 
@@ -38,9 +40,47 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'slug', 'sku', 'oem_code', 'brand', 'price', 'compare_at_price',
             'stock', 'in_stock', 'available_stock', 'image_url', 'is_featured', 'category_name', 'category_slug',
-            'compatible_vehicles', 'seller_name', 'seller_slug', 'average_rating', 'review_count',
+            'compatible_vehicles', 'seller_name', 'seller_slug', 'seller_is_official', 'seller_ships_from_platform',
+            'average_rating', 'review_count',
             'part_condition', 'part_origin', 'warranty_days',
         ]
+
+    def _seller_meta(self, obj):
+        cache = getattr(self, '_seller_meta_cache', None)
+        if cache is None:
+            self._seller_meta_cache = {}
+            cache = self._seller_meta_cache
+        if obj.id in cache:
+            return cache[obj.id]
+        from api.models import SystemConfig
+        if obj.seller_id:
+            cache[obj.id] = {
+                'name': obj.seller.store_name,
+                'slug': obj.seller.slug,
+                'is_official': obj.seller.is_official,
+                'ships_from_platform': obj.seller.ships_from_platform,
+            }
+        else:
+            config = SystemConfig.get_config()
+            cache[obj.id] = {
+                'name': config.store_name or 'Galelugi Peças',
+                'slug': '',
+                'is_official': True,
+                'ships_from_platform': True,
+            }
+        return cache[obj.id]
+
+    def get_seller_name(self, obj):
+        return self._seller_meta(obj)['name']
+
+    def get_seller_slug(self, obj):
+        return self._seller_meta(obj)['slug']
+
+    def get_seller_is_official(self, obj):
+        return self._seller_meta(obj)['is_official']
+
+    def get_seller_ships_from_platform(self, obj):
+        return self._seller_meta(obj)['ships_from_platform']
 
     def get_in_stock(self, obj):
         return self.get_available_stock(obj) > 0
@@ -65,9 +105,11 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     in_stock = serializers.SerializerMethodField()
     available_stock = serializers.SerializerMethodField()
-    seller_name = serializers.CharField(source='seller.store_name', read_only=True, default='')
-    seller_slug = serializers.CharField(source='seller.slug', read_only=True, default='')
+    seller_name = serializers.SerializerMethodField()
+    seller_slug = serializers.SerializerMethodField()
     seller_id = serializers.IntegerField(source='seller.id', read_only=True, allow_null=True)
+    seller_is_official = serializers.SerializerMethodField()
+    seller_ships_from_platform = serializers.SerializerMethodField()
     sales_count = serializers.SerializerMethodField()
     sales_revenue = serializers.SerializerMethodField()
     seo_title = serializers.SerializerMethodField()
@@ -83,11 +125,41 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'id', 'name', 'slug', 'description', 'sku', 'oem_code', 'brand', 'price', 'cost_price',
             'compare_at_price', 'stock', 'in_stock', 'available_stock', 'image_url', 'is_featured', 'is_active',
             'compatible_vehicles', 'vehicle_models', 'category', 'images', 'seller_name', 'seller_slug', 'seller_id',
+            'seller_is_official', 'seller_ships_from_platform',
             'sales_count', 'sales_revenue', 'average_rating', 'review_count', 'margin',
             'weight_kg', 'width_cm', 'height_cm', 'length_cm',
             'part_condition', 'part_origin', 'warranty_days',
             'seo_title', 'seo_description', 'created_at', 'updated_at',
         ]
+
+    def _seller_meta(self, obj):
+        from api.models import SystemConfig
+        if obj.seller_id:
+            return {
+                'name': obj.seller.store_name,
+                'slug': obj.seller.slug,
+                'is_official': obj.seller.is_official,
+                'ships_from_platform': obj.seller.ships_from_platform,
+            }
+        config = SystemConfig.get_config()
+        return {
+            'name': config.store_name or 'Galelugi Peças',
+            'slug': '',
+            'is_official': True,
+            'ships_from_platform': True,
+        }
+
+    def get_seller_name(self, obj):
+        return self._seller_meta(obj)['name']
+
+    def get_seller_slug(self, obj):
+        return self._seller_meta(obj)['slug']
+
+    def get_seller_is_official(self, obj):
+        return self._seller_meta(obj)['is_official']
+
+    def get_seller_ships_from_platform(self, obj):
+        return self._seller_meta(obj)['ships_from_platform']
 
     def get_in_stock(self, obj):
         return self.get_available_stock(obj) > 0

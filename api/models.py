@@ -68,6 +68,7 @@ class Seller(models.Model):
         PENDING = 'pending', 'Aguardando aprovação'
         ACTIVE = 'active', 'Ativa'
         SUSPENDED = 'suspended', 'Suspensa'
+        REJECTED = 'rejected', 'Rejeitada'
 
     user = models.OneToOneField(
         User,
@@ -80,6 +81,12 @@ class Seller(models.Model):
     description = models.TextField(blank=True, default='', verbose_name='Descrição')
     document = models.CharField(max_length=20, blank=True, default='', verbose_name='CPF/CNPJ')
     phone = models.CharField(max_length=20, blank=True, default='', verbose_name='Telefone')
+    estimated_stock_units = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Peças em estoque (aprox.)',
+        help_text='Quantidade aproximada de peças que o vendedor informou na solicitação.',
+    )
+    admin_notes = models.TextField(blank=True, default='', verbose_name='Notas do admin')
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -103,6 +110,28 @@ class Seller(models.Model):
     )
     balance_pending = models.DecimalField(
         max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name='Saldo pendente (saques)',
+    )
+    origin_zip = models.CharField(
+        max_length=12, blank=True, default='', verbose_name='CEP de origem (frete)',
+    )
+    shipping_address = models.CharField(
+        max_length=255, blank=True, default='', verbose_name='Endereço de envio',
+    )
+    shipping_city = models.CharField(
+        max_length=120, blank=True, default='', verbose_name='Cidade',
+    )
+    shipping_state = models.CharField(
+        max_length=2, blank=True, default='', verbose_name='UF',
+    )
+    ships_from_platform = models.BooleanField(
+        default=False,
+        verbose_name='Envio pela plataforma (Sandroni)',
+        help_text='Peças saem do endereço da loja oficial, não do CEP do vendedor.',
+    )
+    is_official = models.BooleanField(
+        default=False,
+        verbose_name='Loja oficial',
+        help_text='Exibe selo de loja oficial (ex.: Auto Peças Sandroni).',
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
@@ -1029,6 +1058,7 @@ class NotificationType(models.TextChoices):
     RETURN_APPROVED = 'return_approved', 'Devolução aprovada'
     PAYOUT_PAID = 'payout_paid', 'Saque pago'
     INVOICE_ISSUED = 'invoice_issued', 'Nota fiscal emitida'
+    INVOICE_REQUESTED = 'invoice_requested', 'NF-e solicitada'
 
 
 class UserNotification(models.Model):
@@ -1077,6 +1107,9 @@ class InvoiceRequest(models.Model):
     )
     invoice_number = models.CharField(max_length=80, blank=True, default='', verbose_name='Número NF-e')
     invoice_url = models.URLField(max_length=500, blank=True, default='', verbose_name='PDF/XML')
+    nuvem_fiscal_id = models.CharField(max_length=64, blank=True, default='', db_index=True, verbose_name='ID Nuvem Fiscal')
+    nuvem_fiscal_status = models.CharField(max_length=32, blank=True, default='', verbose_name='Status Nuvem Fiscal')
+    nuvem_fiscal_chave = models.CharField(max_length=44, blank=True, default='', verbose_name='Chave NF-e')
     admin_notes = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

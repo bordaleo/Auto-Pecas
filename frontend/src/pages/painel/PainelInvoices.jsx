@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { painelApi } from '../../api/client';
+import { api, painelApi } from '../../api/client';
+import { useToast } from '../../context/ToastContext';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Todas' },
@@ -12,7 +13,11 @@ const STATUS_OPTIONS = [
 
 export default function PainelInvoices() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [rows, setRows] = useState([]);
+  const [nuvemConfigured, setNuvemConfigured] = useState(false);
+  const [nuvemMock, setNuvemMock] = useState(false);
+  const [emittingId, setEmittingId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('requested');
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({
@@ -33,7 +38,26 @@ export default function PainelInvoices() {
       .then((d) => { if (!d.authenticated) navigate('/painel/entrar/'); })
       .catch(() => navigate('/painel/entrar/'));
     load().catch(() => setRows([]));
+    api('/invoices/nuvem-fiscal/status', { credentials: 'include' })
+      .then((data) => {
+        setNuvemConfigured(Boolean(data.configured));
+        setNuvemMock(Boolean(data.mock));
+      })
+      .catch(() => setNuvemConfigured(false));
   }, [navigate, statusFilter]);
+
+  const emitViaNuvem = async (rowId) => {
+    setEmittingId(rowId);
+    try {
+      await painelApi(`/invoices/${rowId}/emit/`, { method: 'POST' });
+      showToast('NF-e enviada à Nuvem Fiscal.');
+      load();
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      setEmittingId(null);
+    }
+  };
 
   const openEdit = (row) => {
     setEditing(row.id);
@@ -46,18 +70,33 @@ export default function PainelInvoices() {
   };
 
   const save = async () => {
-    await painelApi('/painel/invoices', {
-      method: 'PATCH',
-      body: JSON.stringify({ id: editing, ...form }),
-    });
-    setEditing(null);
-    load();
+    if (form.status === 'issued' && (!form.invoice_number.trim() || !form.invoice_url.trim())) {
+      showToast('Informe número e URL da NF-e antes de marcar como emitida.');
+      return;
+    }
+    try {
+      await painelApi('/painel/invoices', {
+        method: 'PATCH',
+        body: JSON.stringify({ id: editing, ...form }),
+      });
+      showToast('NF-e atualizada');
+      setEditing(null);
+      load();
+    } catch (err) {
+      showToast(err.message);
+    }
   };
 
   return (
     <div>
       <h1>NF-e solicitadas</h1>
-      <p className="painel-sub">Emita ou oriente vendedores sobre notas fiscais para pedidos B2B.</p>
+      <p className="painel-sub">
+        {nuvemConfigured
+          ? (nuvemMock
+            ? 'Modo simulação — NF-e fictícia, sem API real.'
+            : 'Nuvem Fiscal configurada — emita automaticamente ou registre manualmente.')
+          : 'Emita no sistema fiscal, registre número e link do PDF. O cliente recebe email e notificação.'}
+      </p>
 
       <div className="painel-toolbar">
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -83,11 +122,22 @@ export default function PainelInvoices() {
               <span>#{row.order_id}</span>
               <span>
                 <strong>{row.company_name}</strong>
-                <small>{row.cnpj}</small>
+                <small>{row.cnpj_formatted || row.cnpj} · {row.company_email}</small>
               </span>
               <span>{row.seller_name}</span>
               <span>{row.status_display}</span>
               <span>
+                {nuvemConfigured && row.status !== 'issued' && (
+                  <button
+                    type="button"
+                    className="btn btn-accent btn-sm"
+                    style={{ marginRight: '0.35rem' }}
+                    disabled={emittingId === row.id}
+                    onClick={() => emitViaNuvem(row.id)}
+                  >
+                    {emittingId === row.id ? 'Emitindo...' : (nuvemMock ? 'Simular' : 'Nuvem Fiscal')}
+                  </button>
+                )}
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEdit(row)}>
                   Gerenciar
                 </button>

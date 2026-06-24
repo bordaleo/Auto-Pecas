@@ -62,6 +62,15 @@ export function CartProvider({ children }) {
         sku: product.sku || '',
         quantity: qty,
         stock: Number(product.stock) || 0,
+        weight_kg: product.weight_kg || 1,
+        width_cm: product.width_cm || 20,
+        height_cm: product.height_cm || 10,
+        length_cm: product.length_cm || 30,
+        seller_id: product.seller_id || null,
+        seller_name: product.seller_name || '',
+        seller_slug: product.seller_slug || '',
+        seller_is_official: Boolean(product.seller_is_official),
+        seller_ships_from_platform: Boolean(product.seller_ships_from_platform),
       };
       if (index >= 0) next[index] = { ...next[index], quantity: next[index].quantity + qty };
       else next.push(entry);

@@ -204,6 +204,14 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.MultiPartParser',
     ],
     'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+    'DEFAULT_THROTTLE_RATES': {
+        # Janelas curtas (por minuto), estilo varejo — bloqueio temporário, não espera de horas.
+        'auth_login': '30/minute',
+        'auth_register': '20/minute',
+        'auth_password': '10/minute',
+        'auth_verify': '60/minute',
+        'auth_email_target': '5/minute',
+    },
 }
 
 
@@ -327,6 +335,11 @@ PASSWORD_RESET_TOKEN_EXPIRE_HOURS = int(cfg('PASSWORD_RESET_TOKEN_EXPIRE_HOURS',
 MERCADOPAGO_ACCESS_TOKEN = cfg('MERCADOPAGO_ACCESS_TOKEN', None)
 MERCADOPAGO_WEBHOOK_SECRET = cfg('MERCADOPAGO_WEBHOOK_SECRET', None)
 MERCADOPAGO_PUBLIC_KEY = cfg('MERCADOPAGO_PUBLIC_KEY', '') or None
+
+# Nuvem Fiscal (NF-e) — https://dev.nuvemfiscal.com.br/docs/
+# NUVEM_FISCAL_CLIENT_ID, NUVEM_FISCAL_CLIENT_SECRET, NUVEM_FISCAL_EMITTER_CNPJ no .env
+# NUVEM_FISCAL_MOCK=true desliga a API real e simula emissão de NF-e (dev)
+NUVEM_FISCAL_SANDBOX = cfg_bool('NUVEM_FISCAL_SANDBOX', True)
 
 # Cloudinary — imagens de produtos
 CLOUDINARY_CLOUD_NAME = cfg('CLOUDINARY_CLOUD_NAME', None)

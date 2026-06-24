@@ -43,14 +43,20 @@ class EmailService:
     def send_password_reset_email(self, to_email: str, reset_code: str, user_name: str) -> bool:
         if not self.enabled:
             return False
+        frontend = getattr(settings, "FRONTEND_URL", "http://127.0.0.1:3000").rstrip("/")
+        reset_link = f"{frontend}/reset-password?code={reset_code}"
         body = (
             f"<p>Olá, <strong>{user_name}</strong>!</p>"
             f"<p>Use o código abaixo para redefinir sua senha:</p>{_code_block(reset_code)}"
+            f"<p style='text-align:center;margin-top:20px;'>"
+            f"<a href='{reset_link}' style='background:{ACCENT};color:#fff;padding:12px 28px;"
+            f"text-decoration:none;border-radius:8px;font-weight:700;'>Redefinir senha</a></p>"
             f"<p><strong>Válido por 24 horas.</strong> Se não foi você, ignore este email.</p>"
         )
         plain = (
             f"Olá, {user_name}!\n\n"
             f"Seu código para redefinir a senha na {STORE} é: {reset_code}\n\n"
+            f"Acesse: {reset_link}\n\n"
             f"Válido por 24 horas. Se não foi você, ignore este email."
         )
         return send_email(
@@ -182,6 +188,63 @@ class EmailService:
             f"<p>{body}</p>{link_html}"
         )
         return send_email(to_email, f"{title} — {STORE}", _wrap(title, html_body))
+
+    def send_invoice_requested_email(self, invoice_request) -> bool:
+        seller = invoice_request.seller
+        if not seller or not seller.user_id:
+            return False
+        to_email = seller.user.email
+        if not to_email:
+            return False
+        frontend = getattr(settings, "FRONTEND_URL", "http://127.0.0.1:3000").rstrip("/")
+        from api.utils import format_cnpj
+        body = (
+            f"<p>Olá, <strong>{seller.store_name}</strong>!</p>"
+            f"<p>O cliente solicitou NF-e para o pedido <strong>#{invoice_request.order_id}</strong>.</p>"
+            f"<ul style='padding-left:20px;line-height:1.8;'>"
+            f"<li><strong>Razão social:</strong> {invoice_request.company_name}</li>"
+            f"<li><strong>CNPJ:</strong> {format_cnpj(invoice_request.cnpj)}</li>"
+            f"<li><strong>E-mail fiscal:</strong> {invoice_request.company_email or invoice_request.user.email}</li>"
+            f"</ul>"
+            f"<p style='text-align:center;margin-top:24px;'>"
+            f"<a href='{frontend}/vender/' style='background:{ACCENT};color:#fff;padding:12px 28px;"
+            f"text-decoration:none;border-radius:8px;font-weight:700;'>Emitir NF-e no painel</a></p>"
+        )
+        return send_email(
+            to_email,
+            f"NF-e solicitada — pedido #{invoice_request.order_id}",
+            _wrap("Solicitação de NF-e", body),
+            tags=["invoice-request", "transactional"],
+        )
+
+    def send_invoice_issued_email(self, invoice_request) -> bool:
+        to_email = (invoice_request.company_email or invoice_request.user.email or "").strip()
+        if not to_email:
+            return False
+        frontend = getattr(settings, "FRONTEND_URL", "http://127.0.0.1:3000").rstrip("/")
+        pdf_link = invoice_request.invoice_url
+        pdf_html = ""
+        if pdf_link:
+            pdf_html = (
+                f"<p style='text-align:center;margin-top:20px;'>"
+                f"<a href='{pdf_link}' style='background:{ACCENT};color:#fff;padding:12px 28px;"
+                f"text-decoration:none;border-radius:8px;font-weight:700;'>Baixar NF-e</a></p>"
+            )
+        body = (
+            f"<p>Olá!</p>"
+            f"<p>A NF-e do pedido <strong>#{invoice_request.order_id}</strong> foi emitida.</p>"
+            f"<p><strong>Número:</strong> {invoice_request.invoice_number}</p>"
+            f"<p><strong>Empresa:</strong> {invoice_request.company_name}</p>"
+            f"{pdf_html}"
+            f"<p style='font-size:13px;color:#64748b;'>Você também pode acessar em "
+            f"<a href='{frontend}/pedidos/'>Meus pedidos</a>.</p>"
+        )
+        return send_email(
+            to_email,
+            f"NF-e {invoice_request.invoice_number} — pedido #{invoice_request.order_id}",
+            _wrap("Nota fiscal emitida", body),
+            tags=["invoice-issued", "transactional"],
+        )
 
 
 email_service = EmailService()

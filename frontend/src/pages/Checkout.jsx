@@ -38,6 +38,7 @@ export default function Checkout() {
   const [deliveryMethod, setDeliveryMethod] = useState('delivery');
   const [shippingFee, setShippingFee] = useState(0);
   const [shippingLabel, setShippingLabel] = useState('Informe o CEP');
+  const [shippingBreakdown, setShippingBreakdown] = useState([]);
   const [showPayment, setShowPayment] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState('');
   const [preferenceId, setPreferenceId] = useState('');
@@ -81,6 +82,7 @@ export default function Checkout() {
     if (method === 'pickup') {
       setShippingFee(0);
       setShippingLabel('Retirada grátis');
+      setShippingBreakdown([]);
       return;
     }
 
@@ -93,6 +95,7 @@ export default function Checkout() {
         setShippingFee(0);
         setShippingLabel('Informe o CEP');
       }
+      setShippingBreakdown([]);
       return;
     }
 
@@ -104,6 +107,7 @@ export default function Checkout() {
           shipping_zip: digits,
           subtotal: Number(total).toFixed(2),
           cart_items: items.map((item) => ({
+            product_id: item.product_id,
             price: item.price,
             quantity: item.quantity,
             weight_kg: item.weight_kg || 1,
@@ -114,13 +118,26 @@ export default function Checkout() {
         }),
       });
       const fee = parseFloat(quote.shipping_fee) || 0;
+      const breakdown = quote.breakdown || [];
       setShippingFee(fee);
-      const service = quote.shipping_service_name ? ` (${quote.shipping_service_name})` : '';
-      const days = quote.shipping_days ? ` · ${quote.shipping_days} dia(s)` : '';
-      setShippingLabel(fee === 0 ? 'Frete grátis' : `${formatCurrency(fee)}${service}${days}`);
+      setShippingBreakdown(breakdown);
+
+      if (breakdown.length > 1) {
+        const parts = breakdown.map((row) => {
+          const rowFee = parseFloat(row.shipping_fee) || 0;
+          const label = rowFee === 0 ? 'grátis' : formatCurrency(rowFee);
+          return `${row.store_name}: ${label}`;
+        });
+        setShippingLabel(parts.join(' · '));
+      } else {
+        const service = quote.shipping_service_name ? ` (${quote.shipping_service_name})` : '';
+        const days = quote.shipping_days ? ` · ${quote.shipping_days} dia(s)` : '';
+        setShippingLabel(fee === 0 ? 'Frete grátis' : `${formatCurrency(fee)}${service}${days}`);
+      }
     } catch (error) {
       setShippingFee(0);
       setShippingLabel('Informe o CEP');
+      setShippingBreakdown([]);
       showToast(error.message);
     }
   };
@@ -458,6 +475,26 @@ export default function Checkout() {
         <div className="summary-card">
           <div className="summary-row"><span>Subtotal ({items.length} item(ns))</span><span>{formatCurrency(total)}</span></div>
           <div className="summary-row"><span>Frete</span><span>{shippingLabel}</span></div>
+          {shippingBreakdown.length > 1 && (
+            <div className="checkout-shipping-breakdown">
+              {shippingBreakdown.map((row) => (
+                <div key={row.seller_key} className="checkout-shipping-row">
+                  <span>
+                    {row.store_name}
+                    {row.is_official && <span className="store-badge store-badge--sm">Oficial</span>}
+                    {row.ships_from_platform && !row.is_official && (
+                      <span className="store-badge store-badge--sm store-badge--ship">Envio Sandroni</span>
+                    )}
+                  </span>
+                  <span>
+                    {parseFloat(row.shipping_fee) === 0
+                      ? 'Grátis'
+                      : formatCurrency(row.shipping_fee)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
           {discount > 0 && (
             <div className="summary-row summary-discount"><span>Desconto</span><span>- {formatCurrency(discount)}</span></div>
           )}

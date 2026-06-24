@@ -105,7 +105,8 @@ else:
         path('painel/config/', lambda r: frontend_redirect(r, 'painel/config/'), name='painel-config'),
         path('painel/erros/', lambda r: frontend_redirect(r, 'painel/erros/'), name='painel-erros'),
         path('painel/vendedores/', lambda r: frontend_redirect(r, 'painel/vendedores/'), name='painel-vendedores'),
-        path('reset-password', lambda r: frontend_redirect(r, f'reset-password{("?" + r.META.get("QUERY_STRING")) if r.META.get("QUERY_STRING") else ""}'), name='reset_password_link'),
+        path('reset-password/', lambda r: frontend_redirect(r, f'reset-password{("?" + r.META.get("QUERY_STRING")) if r.META.get("QUERY_STRING") else ""}'), name='reset_password_link'),
+        path('reset-password', lambda r: frontend_redirect(r, f'reset-password{("?" + r.META.get("QUERY_STRING")) if r.META.get("QUERY_STRING") else ""}'), name='reset_password_link_no_slash'),
         path('verify-email', lambda r: frontend_redirect(r, f'verify-email{("?" + r.META.get("QUERY_STRING")) if r.META.get("QUERY_STRING") else ""}'), name='verify_email_link'),
         path('verify-email-change', lambda r: frontend_redirect(r, f'verify-email-change{("?" + r.META.get("QUERY_STRING")) if r.META.get("QUERY_STRING") else ""}'), name='verify_email_change_link'),
     ]

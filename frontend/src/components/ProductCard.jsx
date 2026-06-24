@@ -84,10 +84,22 @@ export default function ProductCard({ product, shippingHint }) {
         )}
 
         <div className="gl-card-foot">
-          {product.seller_name && (
-            <Link to={`/loja/${product.seller_slug}/`} className="gl-card-seller">
-              Vendido por {product.seller_name}
-            </Link>
+          {(product.seller_name || product.seller_is_official) && (
+            <div className="gl-card-seller-row">
+              {product.seller_slug ? (
+                <Link to={`/loja/${product.seller_slug}/`} className="gl-card-seller">
+                  Vendido por {product.seller_name}
+                </Link>
+              ) : (
+                <span className="gl-card-seller">Vendido por {product.seller_name}</span>
+              )}
+              {product.seller_is_official && (
+                <span className="store-badge">Oficial</span>
+              )}
+              {product.seller_ships_from_platform && !product.seller_is_official && (
+                <span className="store-badge store-badge--ship">Envio Sandroni</span>
+              )}
+            </div>
           )}
           {inStock ? (
             <span className="gl-card-stock">Em estoque</span>

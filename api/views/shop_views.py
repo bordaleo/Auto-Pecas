@@ -15,7 +15,7 @@ from api.serializers.shop import (
 from api.services.payment_service import payment_service
 from api.services.email_service import email_service
 from api.services.shipping_service import get_pickup_address
-from api.services.melhor_envio_service import calculate_shipping_with_provider
+from api.services.shipping_quote_service import quote_cart_shipping, quote_legacy_cart_shipping
 from api.services.marketplace_service import split_sale_amount
 from api.services.checkout_service import build_order_items_from_request, create_orders_from_cart
 from api.services.stock_reservation_service import release_order_reservations
@@ -40,13 +40,25 @@ class ShippingQuoteView(APIView):
         data = serializer.validated_data
         config = SystemConfig.get_config()
         cart_items = data.get('cart_items') or []
-        fee, is_free, pickup_address, meta = calculate_shipping_with_provider(
-            data['delivery_method'],
-            data['subtotal'],
-            data.get('shipping_zip', ''),
-            cart_items=cart_items or None,
-        )
-        if fee is None:
+        subtotal = data['subtotal']
+        has_product_ids = any(i.get('product_id') for i in cart_items)
+
+        if has_product_ids:
+            fee, breakdown, pickup_address, needs_zip = quote_cart_shipping(
+                data['delivery_method'],
+                data.get('shipping_zip', ''),
+                cart_items,
+                subtotal=subtotal,
+            )
+        else:
+            fee, breakdown, pickup_address, needs_zip = quote_legacy_cart_shipping(
+                data['delivery_method'],
+                data.get('shipping_zip', ''),
+                subtotal,
+                cart_items or None,
+            )
+
+        if needs_zip or fee is None:
             return Response({
                 'shipping_fee': '0.00',
                 'is_free': False,
@@ -57,15 +69,18 @@ class ShippingQuoteView(APIView):
                 'detail': 'Informe um CEP válido (8 dígitos) para calcular o frete.',
             })
 
+        is_free = fee == 0
+        first = breakdown[0] if breakdown else {}
         return Response({
             'shipping_fee': str(fee),
             'is_free': is_free,
             'free_shipping_min': str(config.free_shipping_min),
             'pickup_address': pickup_address,
             'delivery_method': data['delivery_method'],
-            'shipping_service_name': meta.get('service_name', ''),
-            'shipping_days': meta.get('days'),
-            'shipping_provider': meta.get('provider', 'fixed'),
+            'shipping_service_name': first.get('shipping_service_name', ''),
+            'shipping_days': first.get('shipping_days'),
+            'shipping_provider': first.get('shipping_provider', 'fixed'),
+            'breakdown': breakdown,
         })
 
 

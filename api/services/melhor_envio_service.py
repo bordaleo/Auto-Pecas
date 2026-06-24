@@ -27,7 +27,7 @@ def _origin_zip() -> str:
     return digits or '01310100'
 
 
-def quote_melhor_envio(destination_zip: str, cart_items: list[dict]) -> dict | None:
+def quote_melhor_envio(destination_zip: str, cart_items: list[dict], origin_zip: str | None = None) -> dict | None:
     """
     Cota frete no Melhor Envio.
     cart_items: [{price, quantity, weight_kg, width_cm, height_cm, length_cm}, ...]
@@ -57,7 +57,7 @@ def quote_melhor_envio(destination_zip: str, cart_items: list[dict]) -> dict | N
         })
 
     payload = {
-        'from': {'postal_code': _origin_zip()},
+        'from': {'postal_code': normalize_zip(origin_zip or _origin_zip())},
         'to': {'postal_code': dest},
         'products': products,
     }
@@ -101,6 +101,7 @@ def calculate_shipping_with_provider(
     subtotal,
     zip_code=None,
     cart_items: list[dict] | None = None,
+    origin_zip: str | None = None,
 ):
     """
     Calcula frete: Melhor Envio se configurado, senão tabela fixa.
@@ -118,7 +119,7 @@ def calculate_shipping_with_provider(
         return Decimal('0.00'), True, pickup, {'provider': 'free', 'service_name': 'Frete grátis'}
 
     if cart_items:
-        me = quote_melhor_envio(zip_code or '', cart_items)
+        me = quote_melhor_envio(zip_code or '', cart_items, origin_zip=origin_zip)
         if me and me['fee'] is not None:
             return me['fee'], False, pickup, me
 

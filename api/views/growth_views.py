@@ -15,7 +15,20 @@ from api.permissions.seller import IsActiveSeller, get_seller_for_user
 from api.serializers.product import ProductListSerializer
 from api.services.analytics_service import get_seller_analytics
 from api.services.csv_import_service import parse_csv_content, import_products_for_seller
-from api.services.notification_service import notify_invoice_issued
+from api.services.invoice_service import (
+    apply_invoice_update,
+    emit_invoice_via_nuvem_fiscal,
+    on_invoice_requested,
+    validate_invoice_create_payload,
+)
+from api.services.nuvem_fiscal_service import (
+    NuvemFiscalError,
+    api_request_bytes,
+    get_config,
+    is_configured,
+    is_mock_mode,
+)
+from api.utils import format_cnpj
 from api.services.vin_lookup_service import (
     decode_vin, lookup_plate, find_products_for_vehicle, parse_vehicle_text_query,
 )
@@ -106,14 +119,19 @@ class InvoiceRequestListCreateView(APIView):
             'user_email': r.user.email,
             'seller_name': r.seller.store_name if r.seller_id else 'Galelugi Peças',
             'cnpj': r.cnpj,
+            'cnpj_formatted': format_cnpj(r.cnpj),
             'company_name': r.company_name,
             'company_email': r.company_email,
             'status': r.status,
             'status_display': r.get_status_display(),
             'invoice_number': r.invoice_number,
             'invoice_url': r.invoice_url,
+            'nuvem_fiscal_id': r.nuvem_fiscal_id,
+            'nuvem_fiscal_status': r.nuvem_fiscal_status,
+            'nuvem_fiscal_chave': r.nuvem_fiscal_chave,
             'admin_notes': r.admin_notes,
             'created_at': r.created_at.isoformat(),
+            'updated_at': r.updated_at.isoformat(),
         }
 
     def get(self, request):
@@ -145,18 +163,20 @@ class InvoiceRequestListCreateView(APIView):
 
         cnpj = (request.data.get('cnpj') or '').strip()
         company_name = (request.data.get('company_name') or '').strip()
-        if not cnpj or not company_name:
-            return Response({'detail': 'CNPJ e razão social são obrigatórios.'}, status=status.HTTP_400_BAD_REQUEST)
+        validated, error = validate_invoice_create_payload(cnpj=cnpj, company_name=company_name)
+        if error:
+            return Response({'detail': error}, status=status.HTTP_400_BAD_REQUEST)
 
         inv = InvoiceRequest.objects.create(
             order=order,
             user=request.user,
             seller=order.fulfillment_seller,
-            cnpj=cnpj,
-            company_name=company_name,
+            cnpj=validated['cnpj'],
+            company_name=validated['company_name'],
             company_email=request.data.get('company_email') or request.user.email,
         )
-        return Response({'id': inv.id, 'status': inv.status}, status=status.HTTP_201_CREATED)
+        on_invoice_requested(inv)
+        return Response(self._serialize_invoice(inv), status=status.HTTP_201_CREATED)
 
 
 class InvoiceRequestManageView(APIView):
@@ -173,21 +193,87 @@ class InvoiceRequestManageView(APIView):
         if not is_admin and (not seller or inv.seller_id != seller.id):
             return Response({'detail': 'Sem permissão.'}, status=status.HTTP_403_FORBIDDEN)
 
-        new_status = request.data.get('status')
-        if new_status in dict(InvoiceStatus.choices):
-            inv.status = new_status
-        if request.data.get('invoice_number'):
-            inv.invoice_number = request.data['invoice_number']
-        if request.data.get('invoice_url'):
-            inv.invoice_url = request.data['invoice_url']
-        if request.data.get('admin_notes'):
-            inv.admin_notes = request.data['admin_notes']
-        inv.save()
+        error = apply_invoice_update(inv, request.data)
+        if error:
+            return Response({'detail': error}, status=status.HTTP_400_BAD_REQUEST)
 
-        if inv.status == InvoiceStatus.ISSUED:
-            notify_invoice_issued(inv.user, inv)
+        return Response(self._serialize_invoice(inv))
 
-        return Response({'id': inv.id, 'status': inv.status})
+
+class InvoiceNuvemFiscalStatusView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        if not request.user.is_authenticated and not painel_api_authorized(request):
+            return Response({'detail': 'Não autorizado.'}, status=status.HTTP_403_FORBIDDEN)
+        config = get_config()
+        return Response({
+            'configured': is_configured(),
+            'sandbox': config.sandbox if config else None,
+            'mock': is_mock_mode(),
+        })
+
+
+class InvoiceEmitView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, pk):
+        if not request.user.is_authenticated and not painel_api_authorized(request):
+            return Response({'detail': 'Não autorizado.'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            inv = InvoiceRequest.objects.select_related(
+                'order', 'user', 'seller',
+            ).prefetch_related('order__items').get(pk=pk)
+        except InvoiceRequest.DoesNotExist:
+            return Response({'detail': 'Não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        seller = get_seller_for_user(request.user)
+        is_admin = request.user.is_staff or painel_api_authorized(request)
+        if not is_admin and (not seller or inv.seller_id != seller.id):
+            return Response({'detail': 'Sem permissão.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            dfe = emit_invoice_via_nuvem_fiscal(inv)
+        except NuvemFiscalError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        inv.refresh_from_db()
+        return Response({
+            'invoice': InvoiceRequestListCreateView()._serialize_invoice(inv),
+            'nuvem_fiscal': dfe,
+        })
+
+
+class InvoiceNfePdfView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, pk):
+        if not request.user.is_authenticated and not painel_api_authorized(request):
+            return Response({'detail': 'Não autorizado.'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            inv = InvoiceRequest.objects.select_related('user', 'seller').get(pk=pk)
+        except InvoiceRequest.DoesNotExist:
+            return Response({'detail': 'Não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        seller = get_seller_for_user(request.user)
+        is_admin = request.user.is_staff or painel_api_authorized(request)
+        is_owner = inv.user_id == request.user.id
+        is_seller = seller and inv.seller_id == seller.id
+        if not (is_admin or is_owner or is_seller):
+            return Response({'detail': 'Sem permissão.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if not inv.nuvem_fiscal_id:
+            return Response({'detail': 'NF-e ainda não emitida na Nuvem Fiscal.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            pdf = api_request_bytes('GET', f'/nfe/{inv.nuvem_fiscal_id}/pdf')
+        except NuvemFiscalError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.http import HttpResponse
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="nfe-pedido-{inv.order_id}.pdf"'
+        return response
 
 
 class SellerAnalyticsView(APIView):

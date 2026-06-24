@@ -9,7 +9,7 @@ import Catalog from './pages/Catalog';
 import Checkout from './pages/Checkout';
 import Home from './pages/Home';
 import HowItWorks from './pages/HowItWorks';
-import SellerHub from './pages/SellerHub';
+import SellWithUs from './pages/SellWithUs';
 import SellerStore from './pages/SellerStore';
 import Orders from './pages/Orders';
 import Product from './pages/Product';
@@ -18,6 +18,7 @@ import ReturnsPolicy from './pages/ReturnsPolicy';
 import DeliveryTimes from './pages/DeliveryTimes';
 import CompatibilityFaq from './pages/CompatibilityFaq';
 import Manage from './pages/Manage';
+import ResetPassword from './pages/ResetPassword';
 import PainelLayout from './pages/painel/PainelLayout';
 import PainelLogin from './pages/painel/PainelLogin';
 import PainelDashboard from './pages/painel/PainelDashboard';
@@ -62,12 +63,14 @@ export default function App() {
                   <Route path="pedidos" element={<Orders />} />
                   <Route path="perfil" element={<Profile />} />
                   <Route path="vender" element={<SellerHub />} />
+                  <Route path="venda-conosco" element={<SellWithUs />} />
                   <Route path="loja/:slug" element={<SellerStore />} />
                   <Route path="como-funciona" element={<HowItWorks />} />
                   <Route path="trocas-devolucoes" element={<ReturnsPolicy />} />
                   <Route path="prazos-entrega" element={<DeliveryTimes />} />
                   <Route path="faq-compatibilidade" element={<CompatibilityFaq />} />
                   <Route path="gerenciar" element={<Manage />} />
+                  <Route path="reset-password" element={<ResetPassword />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>
               </Routes>

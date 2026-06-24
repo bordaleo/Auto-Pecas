@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
-import { api, formatCurrency, getToken } from '../api/client';
+import { api, formatCnpj, formatCurrency, getToken } from '../api/client';
 import PageSeo from '../components/PageSeo';
 import { useToast } from '../context/ToastContext';
 
@@ -10,6 +10,16 @@ const TRACK_STEPS = [
   { key: 'shipped', label: 'Enviado' },
   { key: 'delivered', label: 'Entregue' },
 ];
+
+const INVOICE_ACTIVE = new Set(['requested', 'processing', 'issued']);
+
+function orderHasInvoice(invoices, orderId) {
+  return invoices.some((inv) => inv.order_id === orderId && INVOICE_ACTIVE.has(inv.status));
+}
+
+function InvoiceStatusBadge({ status, statusDisplay }) {
+  return <span className={`invoice-status invoice-status--${status}`}>{statusDisplay}</span>;
+}
 
 function groupOrders(orders) {
   const map = new Map();
@@ -65,6 +75,7 @@ function TrackingTimeline({ order }) {
 export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [returns, setReturns] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [returnForm, setReturnForm] = useState({ order_item_id: '', reason: '', description: '' });
   const [invoiceForm, setInvoiceForm] = useState({ order_id: '', cnpj: '', company_name: '', company_email: '' });
@@ -76,17 +87,36 @@ export default function Orders() {
       setLoading(false);
       return;
     }
-    Promise.all([api('/shop/orders/'), api('/returns/')])
-      .then(([orderList, returnList]) => {
+    Promise.all([api('/shop/orders/'), api('/returns/'), api('/invoices/')])
+      .then(([orderList, returnList, invoiceList]) => {
         setOrders(orderList);
         setReturns(returnList);
+        setInvoices(invoiceList);
       })
       .catch(() => {
         setOrders([]);
         setReturns([]);
+        setInvoices([]);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const downloadNfePdf = async (invoiceId) => {
+    try {
+      const response = await fetch(`/api/v1/invoices/${invoiceId}/nfe-pdf/`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || 'Não foi possível baixar a NF-e.');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      showToast(err.message);
+    }
+  };
 
   const requestInvoice = async (e) => {
     e.preventDefault();
@@ -95,13 +125,15 @@ export default function Orders() {
         method: 'POST',
         body: JSON.stringify({
           order_id: parseInt(invoiceForm.order_id, 10),
-          cnpj: invoiceForm.cnpj,
+          cnpj: invoiceForm.cnpj.replace(/\D/g, ''),
           company_name: invoiceForm.company_name,
           company_email: invoiceForm.company_email || undefined,
         }),
       });
       showToast('NF-e solicitada! Você será notificado quando emitida.');
       setInvoiceForm({ order_id: '', cnpj: '', company_name: '', company_email: '' });
+      const invoiceList = await api('/invoices/');
+      setInvoices(invoiceList);
     } catch (err) {
       showToast(err.message);
     }
@@ -200,7 +232,7 @@ export default function Orders() {
                     </div>
                   ))}
                 </div>
-                {order.status === 'approved' && (
+                {order.status === 'approved' && !orderHasInvoice(invoices, order.id) && (
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
@@ -209,6 +241,15 @@ export default function Orders() {
                   >
                     Solicitar NF-e
                   </button>
+                )}
+                {order.status === 'approved' && orderHasInvoice(invoices, order.id) && (
+                  <p className="tracking-meta" style={{ marginTop: '0.5rem' }}>
+                    NF-e:{' '}
+                    <InvoiceStatusBadge
+                      status={invoices.find((inv) => inv.order_id === order.id)?.status}
+                      statusDisplay={invoices.find((inv) => inv.order_id === order.id)?.status_display}
+                    />
+                  </p>
                 )}
               </div>
             ))}
@@ -220,7 +261,12 @@ export default function Orders() {
             <h3>Solicitar NF-e — pedido #{invoiceForm.order_id}</h3>
             <div className="form-group">
               <label>CNPJ</label>
-              <input value={invoiceForm.cnpj} onChange={(e) => setInvoiceForm({ ...invoiceForm, cnpj: e.target.value })} required />
+              <input
+                value={invoiceForm.cnpj}
+                onChange={(e) => setInvoiceForm({ ...invoiceForm, cnpj: formatCnpj(e.target.value) })}
+                placeholder="00.000.000/0000-00"
+                required
+              />
             </div>
             <div className="form-group">
               <label>Razão social</label>
@@ -255,6 +301,30 @@ export default function Orders() {
             <button type="submit" className="btn btn-accent">Enviar solicitação</button>
             <button type="button" className="btn btn-secondary" style={{ marginLeft: '0.5rem' }} onClick={() => setReturnForm({ order_item_id: '', reason: '', description: '' })}>Cancelar</button>
           </form>
+        )}
+
+        {invoices.length > 0 && (
+          <section className="internal-page-card">
+            <h3>Minhas NF-e</h3>
+            {invoices.map((inv) => (
+              <div key={inv.id} className="order-item-row" style={{ flexWrap: 'wrap', gap: '0.35rem' }}>
+                <span>
+                  Pedido #{inv.order_id} · {inv.company_name} ({inv.cnpj_formatted || inv.cnpj})
+                </span>
+                <InvoiceStatusBadge status={inv.status} statusDisplay={inv.status_display} />
+                {inv.status === 'issued' && inv.nuvem_fiscal_id && (
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => downloadNfePdf(inv.id)}>
+                    Baixar NF-e {inv.invoice_number ? `#${inv.invoice_number}` : ''}
+                  </button>
+                )}
+                {inv.status === 'issued' && inv.invoice_url && !inv.nuvem_fiscal_id && (
+                  <a href={inv.invoice_url} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+                    Baixar NF-e {inv.invoice_number ? `#${inv.invoice_number}` : ''}
+                  </a>
+                )}
+              </div>
+            ))}
+          </section>
         )}
 
         {returns.length > 0 && (

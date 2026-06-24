@@ -4,6 +4,17 @@ export function formatCurrency(value) {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+export function formatCnpj(value) {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 14);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
+  if (digits.length <= 12) {
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+  }
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+}
+
 export function getToken() {
   return localStorage.getItem('access_token') || '';
 }
@@ -48,7 +59,16 @@ export async function api(path, options = {}) {
     data = null;
   }
 
-  if (!response.ok) throw new Error(parseError(data));
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error(
+        typeof data?.detail === 'string'
+          ? data.detail
+          : 'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
+      );
+    }
+    throw new Error(parseError(data));
+  }
   return data;
 }
 

@@ -166,3 +166,17 @@ def notify_invoice_issued(user, invoice_request):
         link='/pedidos/',
         metadata={'invoice_id': invoice_request.id},
     )
+
+
+def notify_seller_invoice_requested(invoice_request):
+    seller = invoice_request.seller
+    if not seller or not seller.user_id:
+        return
+    create_notification(
+        seller.user,
+        NotificationType.INVOICE_REQUESTED,
+        f'NF-e solicitada — pedido #{invoice_request.order_id}',
+        f'{invoice_request.company_name} ({invoice_request.cnpj})',
+        link='/vender/',
+        metadata={'invoice_id': invoice_request.id, 'order_id': invoice_request.order_id},
+    )

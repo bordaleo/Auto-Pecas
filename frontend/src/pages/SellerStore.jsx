@@ -21,9 +21,15 @@ export default function SellerStore() {
   return (
     <div className="wrap home-section" style={{ marginTop: '1.25rem' }}>
       <div className="seller-store-head">
-        <span className="eyebrow">Loja parceira</span>
-        <h1>{seller.store_name}</h1>
+        <span className="eyebrow">{seller.is_official ? 'Loja oficial' : 'Loja parceira'}</span>
+        <h1>
+          {seller.store_name}
+          {seller.is_official && <span className="store-badge store-badge--lg">Oficial</span>}
+        </h1>
         {seller.description && <p>{seller.description}</p>}
+        {seller.ships_from_platform && (
+          <p className="seller-store-ship-note">Envio realizado pela Auto Peças Sandroni</p>
+        )}
       </div>
       <SectionHeader title="Peças desta loja" />
       <div className="product-grid">

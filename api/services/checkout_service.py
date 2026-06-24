@@ -9,6 +9,7 @@ from django.db import transaction
 from api.models import Order, OrderGroup, OrderItem, OrderStatus, DeliveryMethod, Seller
 from api.services.marketplace_service import split_sale_amount
 from api.services.melhor_envio_service import calculate_shipping_with_provider
+from api.services.shipping_origin import resolve_shipping_origin
 from api.services.shipping_service import get_pickup_address
 from api.services.stock_reservation_service import (
     get_available_stock, create_reservations_for_order,
@@ -27,6 +28,8 @@ def group_cart_items(order_items_data: list[dict]) -> dict[str, list]:
 
 
 def calculate_group_shipping(delivery_method, zip_code, group_items: list[dict], subtotal: Decimal):
+    seller = group_items[0].get('seller') if group_items else None
+    origin_zip, _, _ = resolve_shipping_origin(seller)
     me_cart = [
         {
             'price': float(i['unit_price']),
@@ -39,7 +42,7 @@ def calculate_group_shipping(delivery_method, zip_code, group_items: list[dict],
         for i in group_items
     ]
     return calculate_shipping_with_provider(
-        delivery_method, subtotal, zip_code, cart_items=me_cart,
+        delivery_method, subtotal, zip_code, cart_items=me_cart, origin_zip=origin_zip,
     )
 
 

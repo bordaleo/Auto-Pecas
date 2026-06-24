@@ -70,6 +70,29 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
+  const forgotPassword = useCallback(async (email) => {
+    return api('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }, []);
+
+  const resetPassword = useCallback(async (code, newPassword, passwordConfirm) => {
+    const data = await api('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        code,
+        new_password: newPassword,
+        password_confirm: passwordConfirm,
+      }),
+    });
+    if (data.access_token) {
+      setToken(data.access_token);
+      await refresh();
+    }
+    return data;
+  }, [refresh]);
+
   const logout = useCallback(async () => {
     try {
       await api('/auth/logout', { method: 'POST' });
@@ -81,8 +104,19 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, register, verifyEmail, resendVerification, logout, refresh }),
-    [user, loading, login, register, verifyEmail, resendVerification, logout, refresh],
+    () => ({
+      user,
+      loading,
+      login,
+      register,
+      verifyEmail,
+      resendVerification,
+      forgotPassword,
+      resetPassword,
+      logout,
+      refresh,
+    }),
+    [user, loading, login, register, verifyEmail, resendVerification, forgotPassword, resetPassword, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

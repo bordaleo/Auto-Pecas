@@ -14,6 +14,7 @@ from .views.auth_views import (
     ResendVerificationEmailView,
     ResendEmailChangeVerificationView,
 )
+from .views.melhor_envio_views import MelhorEnvioOAuthCallbackView, MelhorEnvioOAuthInfoView
 from .views.payment_views import (
     PaymentWebhookView,
     PaymentStatusView,
@@ -84,6 +85,9 @@ from .views.growth_views import (
     VehicleLookupView,
     InvoiceRequestListCreateView,
     InvoiceRequestManageView,
+    InvoiceNuvemFiscalStatusView,
+    InvoiceEmitView,
+    InvoiceNfePdfView,
     SellerAnalyticsView,
     SellerCsvImportView,
     SellerCsvTemplateView,
@@ -121,6 +125,8 @@ urlpatterns = [
 
     # Carrinho / pedidos
     path('shop/shipping/quote/', ShippingQuoteView.as_view(), name='shop-shipping-quote'),
+    path('integrations/melhor-envio/callback/', MelhorEnvioOAuthCallbackView.as_view(), name='melhor-envio-callback'),
+    path('integrations/melhor-envio/info/', MelhorEnvioOAuthInfoView.as_view(), name='melhor-envio-oauth-info'),
     path('shop/coupon/validate/', CouponValidateView.as_view(), name='shop-coupon-validate'),
     path('shop/cart/sync/', CartSyncView.as_view(), name='shop-cart-sync'),
     path('shop/checkout/', CheckoutView.as_view(), name='shop-checkout'),
@@ -157,6 +163,9 @@ urlpatterns = [
     path('notifications/', NotificationListView.as_view(), name='notifications'),
     path('notifications/unread/', NotificationUnreadCountView.as_view(), name='notifications-unread'),
     path('invoices/', InvoiceRequestListCreateView.as_view(), name='invoices'),
+    path('invoices/nuvem-fiscal/status', InvoiceNuvemFiscalStatusView.as_view(), name='invoices-nuvem-status'),
+    path('invoices/<int:pk>/emit/', InvoiceEmitView.as_view(), name='invoice-emit'),
+    path('invoices/<int:pk>/nfe-pdf/', InvoiceNfePdfView.as_view(), name='invoice-nfe-pdf'),
     path('invoices/<int:pk>/', InvoiceRequestManageView.as_view(), name='invoice-manage'),
     path('seller/analytics/', SellerAnalyticsView.as_view(), name='seller-analytics'),
     path('seller/products/import/', SellerCsvImportView.as_view(), name='seller-csv-import'),
