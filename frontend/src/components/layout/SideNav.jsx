@@ -2,23 +2,24 @@ import { Link, NavLink } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
 import { formatCurrency } from '../../api/client';
 import Logo from '../Logo';
+import ThemeToggle from '../ThemeToggle';
 
 const SHOP_LINKS = [
-  { to: '/pecas/', label: 'Catálogo completo', icon: 'grid' },
+  { to: '/pecas/', label: 'Catálogo de peças', icon: 'grid' },
   { to: '/pecas/?featured=1', label: 'Destaques', icon: 'star' },
-  { to: '/como-funciona/', label: 'Como funciona', icon: 'info' },
 ];
 
 const HELP_LINKS = [
-  { to: '/faq-compatibilidade/', label: 'FAQ compatibilidade', icon: 'info' },
-  { to: '/prazos-entrega/', label: 'Prazos de entrega', icon: 'box' },
+  { to: '/como-funciona/', label: 'Como funciona', icon: 'info' },
+  { to: '/faq-compatibilidade/', label: 'Compatibilidade', icon: 'info' },
+  { to: '/prazos-entrega/', label: 'Entrega e prazos', icon: 'box' },
   { to: '/trocas-devolucoes/', label: 'Trocas e devoluções', icon: 'store' },
 ];
 
 const ACCOUNT_LINKS = [
-  { to: '/pedidos/', label: 'Meus pedidos', icon: 'box' },
-  { to: '/venda-conosco/', label: 'Venda conosco', icon: 'store', accent: true },
+  { to: '/conta/', label: 'Minha conta', icon: 'box' },
   { to: '/vender/', label: 'Minha loja', icon: 'store' },
+  { to: '/venda-conosco/', label: 'Venda conosco', icon: 'store', accent: true },
 ];
 
 function NavIcon({ name }) {
@@ -56,7 +57,7 @@ export default function SideNav({ open, onClose }) {
         </Link>
 
         <div className="sidebar-group">
-          <span className="sidebar-label">Loja</span>
+          <span className="sidebar-label">Comprar</span>
           <nav className="sidebar-nav">
             {SHOP_LINKS.map((item) => (
               <NavLink
@@ -79,6 +80,7 @@ export default function SideNav({ open, onClose }) {
               <NavLink
                 key={item.to}
                 to={item.to}
+                end={item.to === '/conta/'}
                 className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}${item.accent ? ' sidebar-link--accent' : ''}`}
                 onClick={onClose}
               >
@@ -110,6 +112,10 @@ export default function SideNav({ open, onClose }) {
           <NavIcon name="chat" />
           Suporte WhatsApp
         </a>
+
+        <div className="sidebar-theme">
+          <ThemeToggle className="theme-toggle--sidebar" showLabel />
+        </div>
 
         <div className="sidebar-promo">
           <strong>{config.store_tagline || 'Frete grátis em milhares de peças'}</strong>

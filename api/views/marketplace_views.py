@@ -193,6 +193,16 @@ class VehicleBrandListView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        from django.core.cache import cache
+        from api.services.fipe_sync_service import sync_fipe_vehicles
+
+        if VehicleBrand.objects.filter(is_active=True).count() < 12:
+            if cache.add('galelugi_fipe_sync', 1, 3600):
+                try:
+                    sync_fipe_vehicles(max_brands=40)
+                except Exception:
+                    pass
+
         brands = VehicleBrand.objects.filter(is_active=True).order_by('name')
         return Response(VehicleBrandListSerializer(brands, many=True).data)
 
@@ -204,6 +214,7 @@ class VehicleModelListView(APIView):
         qs = VehicleModel.objects.filter(is_active=True).select_related('brand')
         brand = request.query_params.get('brand', '').strip()
         year = request.query_params.get('year', '').strip()
+        q = request.query_params.get('q', '').strip()
         if brand:
             qs = qs.filter(Q(brand__slug=brand) | Q(brand__name__iexact=brand))
         if year:
@@ -212,7 +223,9 @@ class VehicleModelListView(APIView):
                 qs = qs.filter(year_start__lte=y, year_end__gte=y)
             except ValueError:
                 pass
-        return Response(VehicleModelSerializer(qs.order_by('brand__name', 'name')[:500], many=True).data)
+        if q:
+            qs = qs.filter(name__icontains=q)
+        return Response(VehicleModelSerializer(qs.order_by('brand__name', 'name')[:800], many=True).data)
 
 
 class ReturnRequestListCreateView(APIView):

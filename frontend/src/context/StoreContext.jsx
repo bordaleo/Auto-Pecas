@@ -10,7 +10,7 @@ const DEFAULT_CONFIG = {
   free_shipping_min: 299,
   store_whatsapp: '',
   mercadopago_public_key: '',
-  marketplace_commission_percent: 12,
+  marketplace_commission_percent: 8,
   google_analytics_id: '',
   meta_pixel_id: '',
 };

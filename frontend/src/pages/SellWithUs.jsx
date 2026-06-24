@@ -31,7 +31,7 @@ const STEPS = [
 export default function SellWithUs() {
   const { config } = useStore();
   const { openAuth } = useOutletContext();
-  const commission = config.marketplace_commission_percent || 12;
+  const commission = config.marketplace_commission_percent || 8;
   const official = config.official_seller;
   const storeName = official?.store_name || config.store_name || 'Auto Peças Sandroni';
 
@@ -62,7 +62,9 @@ export default function SellWithUs() {
       </section>
 
       <section className="sell-shipping">
-        <h2>Como funciona o frete?</h2>
+        <header className="page-section-head">
+          <h2>Como funciona o frete?</h2>
+        </header>
         <div className="sell-shipping-grid">
           <article className="sell-shipping-card">
             <span className="sell-shipping-tag">Opção A</span>
@@ -84,7 +86,9 @@ export default function SellWithUs() {
       </section>
 
       <section className="sell-steps">
-        <h2>Comece em 4 passos</h2>
+        <header className="page-section-head">
+          <h2>Comece em 4 passos</h2>
+        </header>
         <div className="sell-steps-grid">
           {STEPS.map((step) => (
             <article key={step.n} className="sell-step">

@@ -8,7 +8,7 @@ def get_commission_rate(seller=None):
     if seller and seller.commission_rate is not None:
         return seller.commission_rate
     config = SystemConfig.get_config()
-    return getattr(config, 'marketplace_commission_percent', None) or Decimal('12.00')
+    return getattr(config, 'marketplace_commission_percent', None) or Decimal('8.00')
 
 
 def split_sale_amount(gross_amount, seller=None):

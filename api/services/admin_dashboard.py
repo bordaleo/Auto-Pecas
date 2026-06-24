@@ -138,4 +138,10 @@ def get_painel_dashboard_slice(page: str, days: int = 14) -> dict:
         "sales_by_day": payload["sales_by_day"],
         "recent_orders": payload["recent_orders"],
         "top_products": payload["top_products"][:5],
+        "part_requests": get_part_request_admin_metrics(days=days),
     }
+
+
+def get_part_request_admin_metrics(days: int = 30) -> dict:
+    from api.services.part_request_service import get_part_request_admin_metrics as _metrics
+    return _metrics(days=days)

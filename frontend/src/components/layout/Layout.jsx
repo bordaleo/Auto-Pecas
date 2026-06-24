@@ -25,6 +25,15 @@ export default function Layout() {
       <div className="app-body">
         <SideNav open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="app-content">
+          <div className="app-bg" aria-hidden="true">
+            <div className="app-bg-orb app-bg-orb--copper" />
+            <div className="app-bg-orb app-bg-orb--sage" />
+            <div className="app-bg-orb app-bg-orb--midnight" />
+            <div className="app-bg-orb app-bg-orb--accent" />
+            <div className="app-bg-grid" />
+            <div className="app-bg-noise" />
+            <div className="app-bg-vignette" />
+          </div>
           <Header onOpenAuth={openAuth} onOpenSidebar={() => setSidebarOpen(true)} />
           <main className="app-main">
             <Outlet context={{ openAuth }} />

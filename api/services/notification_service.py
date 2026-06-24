@@ -180,3 +180,43 @@ def notify_seller_invoice_requested(invoice_request):
         link='/vender/',
         metadata={'invoice_id': invoice_request.id, 'order_id': invoice_request.order_id},
     )
+
+
+def notify_part_request_new(part_request):
+    """Notifica vendedores com estoque compatível (fallback: todos os ativos)."""
+    from api.services.part_request_service import find_matching_sellers
+    sellers = find_matching_sellers(part_request).select_related('user')
+    preview = part_request.description[:120]
+    if len(part_request.description) > 120:
+        preview += '…'
+    for seller in sellers:
+        create_notification(
+            seller.user,
+            NotificationType.PART_REQUEST_NEW,
+            'Novo pedido de peça',
+            preview,
+            link='/vender/',
+            metadata={'part_request_id': part_request.id},
+        )
+
+
+def notify_part_request_response(part_request, seller):
+    create_notification(
+        part_request.requester,
+        NotificationType.PART_REQUEST_RESPONSE,
+        f'{seller.store_name} respondeu ao seu pedido',
+        part_request.description[:120],
+        link='/solicitacoes/',
+        metadata={'part_request_id': part_request.id, 'seller_id': seller.id},
+    )
+
+
+def notify_part_request_message(recipient, part_request, sender_name: str):
+    create_notification(
+        recipient,
+        NotificationType.PART_REQUEST_MESSAGE,
+        'Nova mensagem no pedido de peça',
+        f'{sender_name}: {part_request.description[:80]}',
+        link='/solicitacoes/' if recipient.id == part_request.requester_id else '/vender/',
+        metadata={'part_request_id': part_request.id},
+    )

@@ -181,7 +181,7 @@ export default function Checkout() {
         if (status.status === 'approved') {
           clearCart();
           showToast('PIX confirmado! Pedido aprovado.');
-          navigate('/pedidos/');
+          navigate('/conta/pedidos/');
         }
       } catch {
         /* continua polling */
@@ -199,7 +199,7 @@ export default function Checkout() {
     if (data.status === 'approved') {
       clearCart();
       showToast('Pagamento aprovado!');
-      setTimeout(() => navigate('/pedidos/'), 1500);
+      setTimeout(() => navigate('/conta/pedidos/'), 1500);
       resolve();
       return;
     }

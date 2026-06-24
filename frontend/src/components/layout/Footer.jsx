@@ -32,14 +32,15 @@ export default function Footer({ onOpenAuth }) {
             <li><Link to="/pecas/">Catálogo</Link></li>
             <li><Link to="/como-funciona/">Como funciona</Link></li>
             <li><Link to="/pecas/?featured=1">Destaques</Link></li>
-            <li><Link to="/pedidos/">Meus pedidos</Link></li>
+            <li><Link to="/conta/pedidos/">Meus pedidos</Link></li>
+            <li><Link to="/conta/solicitacoes/">Pedido de peça</Link></li>
           </ul>
         </div>
 
         <div className="footer-col">
           <h4>Conta</h4>
           <ul>
-            <li><Link to="/perfil/">Minha conta</Link></li>
+            <li><Link to="/conta/">Minha conta</Link></li>
             <li>
               <button type="button" className="footer-btn" onClick={() => onOpenAuth('login')}>
                 Entrar / Cadastrar

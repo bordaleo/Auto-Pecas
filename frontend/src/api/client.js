@@ -95,3 +95,26 @@ export function productList(data) {
 export function productCount(data, list) {
   return data?.count ?? list.length;
 }
+
+/** Busca todas as páginas de produtos (até maxPages). */
+export async function fetchProductPages(basePath, { maxPages = 4, pageSize = 60 } = {}) {
+  const buildUrl = (page) => {
+    const sep = basePath.includes('?') ? '&' : '?';
+    return `${basePath}${sep}page=${page}&page_size=${pageSize}`;
+  };
+
+  let page = 1;
+  let all = [];
+  let total = 0;
+
+  while (page <= maxPages) {
+    const data = await api(buildUrl(page));
+    const list = productList(data);
+    total = productCount(data, list);
+    all = all.concat(list);
+    if (all.length >= total || list.length < pageSize) break;
+    page += 1;
+  }
+
+  return { results: all, count: total };
+}

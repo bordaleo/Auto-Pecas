@@ -1,5 +1,6 @@
 import InternalPage from '../components/InternalPage';
 import PageSeo from '../components/PageSeo';
+import ReturnRequestPanel from '../components/ReturnRequestPanel';
 
 export default function ReturnsPolicy() {
   return (
@@ -12,6 +13,10 @@ export default function ReturnsPolicy() {
         title="Trocas e devoluções"
         subtitle="Compre com tranquilidade — saiba quando e como trocar sua peça."
       >
+        <section className="return-policy-action">
+          <ReturnRequestPanel />
+        </section>
+
         <section>
           <h2>7 dias para arrependimento</h2>
           <p>
@@ -24,16 +29,16 @@ export default function ReturnsPolicy() {
           <h2>Peça errada ou com defeito</h2>
           <p>
             Se a peça não for compatível com seu veículo (divergência de OEM/código) ou apresentar defeito
-            de fabricação, entre em contato pelo WhatsApp em até <strong>30 dias</strong> com fotos e número do pedido.
+            de fabricação, solicite pelo formulário acima em até <strong>30 dias</strong> com fotos e número do pedido.
             Analisamos e orientamos troca ou reembolso.
           </p>
         </section>
         <section>
-          <h2>Como solicitar</h2>
+          <h2>Como funciona</h2>
           <ol>
-            <li>Acesse <strong>Meus pedidos</strong> e anote o número do pedido.</li>
-            <li>Chame o suporte pelo WhatsApp informando o motivo.</li>
-            <li>Aguarde a autorização e instruções de envio ou coleta.</li>
+            <li>Selecione o item e o motivo no formulário no topo desta página.</li>
+            <li>Aguarde a análise do vendedor (até 2 dias úteis).</li>
+            <li>Se aprovado, envie a peça conforme instruções ou receba reembolso via Mercado Pago.</li>
           </ol>
         </section>
         <section>

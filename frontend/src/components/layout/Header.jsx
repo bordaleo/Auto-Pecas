@@ -5,6 +5,7 @@ import { useCart } from '../../context/CartContext';
 import Logo from '../Logo';
 import CategoryNav from '../CategoryNav';
 import NotificationBell from '../NotificationBell';
+import ThemeToggle from '../ThemeToggle';
 import { SidebarToggle } from './SideNav';
 
 export default function Header({ onOpenAuth, onOpenSidebar }) {
@@ -50,9 +51,10 @@ export default function Header({ onOpenAuth, onOpenSidebar }) {
           </form>
 
           <div className="header-actions">
+            <ThemeToggle />
             {user && <NotificationBell />}
             {user ? (
-              <Link to="/perfil/" className="header-action">
+              <Link to="/conta/" className="header-action">
                 <span className="header-action-label">{firstName}</span>
                 <span className="header-action-title">Minha conta</span>
               </Link>

@@ -92,6 +92,17 @@ from .views.growth_views import (
     SellerCsvImportView,
     SellerCsvTemplateView,
 )
+from .views.part_request_views import (
+    PartRequestListCreateView,
+    PartRequestDetailView,
+    PartRequestSuggestionsView,
+    SellerPartRequestListView,
+    SellerPartRequestStatsView,
+    PartRequestRespondView,
+    PartRequestRateView,
+    PartRequestConversationListView,
+    PartRequestChatMessagesView,
+)
 
 router = DefaultRouter()
 
@@ -177,6 +188,17 @@ urlpatterns = [
     path('chat/start/', ChatStartView.as_view(), name='chat-start'),
     path('chat/<int:conv_id>/messages/', ChatMessagesView.as_view(), name='chat-messages'),
     path('products/<int:product_id>/whatsapp/', ProductWhatsAppLinkView.as_view(), name='product-whatsapp'),
+
+    # Pedidos de peça (demanda pública)
+    path('part-requests/suggestions/', PartRequestSuggestionsView.as_view(), name='part-request-suggestions'),
+    path('part-requests/', PartRequestListCreateView.as_view(), name='part-requests'),
+    path('part-requests/conversations/', PartRequestConversationListView.as_view(), name='part-request-conversations'),
+    path('part-requests/chat/<int:conv_id>/messages/', PartRequestChatMessagesView.as_view(), name='part-request-chat-messages'),
+    path('part-requests/chat/<int:conv_id>/rate/', PartRequestRateView.as_view(), name='part-request-rate'),
+    path('part-requests/<int:pk>/', PartRequestDetailView.as_view(), name='part-request-detail'),
+    path('part-requests/<int:pk>/respond/', PartRequestRespondView.as_view(), name='part-request-respond'),
+    path('seller/part-requests/stats/', SellerPartRequestStatsView.as_view(), name='seller-part-request-stats'),
+    path('seller/part-requests/', SellerPartRequestListView.as_view(), name='seller-part-requests'),
 
     # Contato
     path('contact/whatsapp/', WhatsAppContactView.as_view(), name='contact-whatsapp'),

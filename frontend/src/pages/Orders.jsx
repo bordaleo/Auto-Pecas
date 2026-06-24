@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { api, formatCnpj, formatCurrency, getToken } from '../api/client';
 import PageSeo from '../components/PageSeo';
+import PageLoader from '../components/ui/PageLoader';
 import { useToast } from '../context/ToastContext';
 
 const TRACK_STEPS = [
@@ -79,7 +80,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [returnForm, setReturnForm] = useState({ order_item_id: '', reason: '', description: '' });
   const [invoiceForm, setInvoiceForm] = useState({ order_id: '', cnpj: '', company_name: '', company_email: '' });
-  const { openAuth } = useOutletContext();
+  const { openAuth, accountEmbedded } = useOutletContext() || {};
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -160,6 +161,7 @@ export default function Orders() {
   };
 
   if (!getToken()) {
+    if (accountEmbedded) return null;
     return (
       <div className="wrap internal-page orders-page">
         <div className="internal-page-card">
@@ -172,23 +174,16 @@ export default function Orders() {
     );
   }
 
-  return (
+  const content = (
     <>
-      <PageSeo title="Meus pedidos | Galelugi Peças" description="Acompanhe suas compras e rastreamento de entrega." />
-      <div className="wrap internal-page orders-page">
-        <header className="internal-page-head">
-          <h1>Suas compras</h1>
-          <p>Histórico de pedidos e rastreamento de envio.</p>
-        </header>
-
-        {loading && <div className="internal-page-card"><p>Carregando...</p></div>}
+        {loading && <PageLoader label="Carregando pedidos..." />}
         {!loading && orders.length === 0 && (
-          <div className="internal-page-card">
-            <p className="state-empty">Nenhum pedido. <Link to="/pecas/">Comprar peças</Link></p>
+          <div className="form-card">
+            <p className="form-card-body state-empty">Nenhum pedido. <Link to="/pecas/">Comprar peças</Link></p>
           </div>
         )}
         {groupOrders(orders).map((group) => (
-          <article key={group.key} className="internal-page-card order-card">
+          <article key={group.key} className="form-card order-card">
             <div className="order-card-head">
               <strong>
                 {group.groupId ? `Compra #${group.groupId}` : `Pedido #${group.orders[0].id}`}
@@ -304,7 +299,7 @@ export default function Orders() {
         )}
 
         {invoices.length > 0 && (
-          <section className="internal-page-card">
+          <section className="form-card">
             <h3>Minhas NF-e</h3>
             {invoices.map((inv) => (
               <div key={inv.id} className="order-item-row" style={{ flexWrap: 'wrap', gap: '0.35rem' }}>
@@ -328,7 +323,7 @@ export default function Orders() {
         )}
 
         {returns.length > 0 && (
-          <section className="internal-page-card">
+          <section className="form-card">
             <h3>Minhas devoluções</h3>
             {returns.map((r) => (
               <div key={r.id} className="order-item-row">
@@ -337,6 +332,20 @@ export default function Orders() {
             ))}
           </section>
         )}
+    </>
+  );
+
+  if (accountEmbedded) return <div className="orders-page">{content}</div>;
+
+  return (
+    <>
+      <PageSeo title="Meus pedidos | Galelugi Peças" description="Acompanhe suas compras e rastreamento de entrega." />
+      <div className="wrap internal-page orders-page">
+        <header className="internal-page-head">
+          <h1>Suas compras</h1>
+          <p>Histórico de pedidos e rastreamento de envio.</p>
+        </header>
+        {content}
       </div>
     </>
   );

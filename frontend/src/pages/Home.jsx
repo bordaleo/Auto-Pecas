@@ -96,7 +96,7 @@ export default function Home() {
             <h3>Tem peças para vender? Abra sua loja na Galelugi</h3>
             <p>
               Publique anúncios, alcance compradores em todo o Brasil e receba o repasse após cada venda.
-              Comissão de {config.marketplace_commission_percent || 12}% por transação.
+              Comissão de {config.marketplace_commission_percent || 8}% por transação.
             </p>
           </div>
             <Link to="/como-funciona/" className="btn btn-secondary" style={{ marginRight: '0.5rem' }}>Como funciona</Link>

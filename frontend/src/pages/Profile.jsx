@@ -8,7 +8,7 @@ import PageSeo from '../components/PageSeo';
 export default function Profile() {
   const { user, logout, refresh } = useAuth();
   const { showToast } = useToast();
-  const { openAuth } = useOutletContext();
+  const { openAuth, accountEmbedded } = useOutletContext() || {};
   const navigate = useNavigate();
   const [form, setForm] = useState({
     name: '', phone: '', shipping_zip: '', shipping_address: '', shipping_city: '', shipping_state: '',
@@ -28,6 +28,7 @@ export default function Profile() {
   }, [user]);
 
   if (!getToken()) {
+    if (accountEmbedded) return null;
     return (
       <div className="wrap internal-page">
         <div className="internal-page-card">
@@ -58,18 +59,17 @@ export default function Profile() {
     navigate('/');
   };
 
-  return (
-    <>
-      <PageSeo title="Minha conta | Galelugi Peças" description="Gerencie seus dados e endereço de entrega na Galelugi." />
-      <div className="wrap internal-page profile-page">
-        <header className="internal-page-head">
-          <h1>Minha conta</h1>
-          <p>Dados usados no checkout e cálculo de frete.</p>
-        </header>
-
-        <form className="internal-page-card profile-form" onSubmit={handleSubmit}>
+  const formContent = (
+    <form className={`${accountEmbedded ? 'form-card' : 'internal-page-card profile-form'}`} onSubmit={handleSubmit}>
+      {!accountEmbedded && <h2>Dados pessoais</h2>}
+      {accountEmbedded && (
+        <header className="form-card-head">
           <h2>Dados pessoais</h2>
-          <div className="form-row-2">
+          <p className="form-hint">Usados no checkout e no cálculo de frete.</p>
+        </header>
+      )}
+      <div className={accountEmbedded ? 'form-card-body' : undefined}>
+      <div className="form-row form-row--2">
             <div className="form-group">
               <label>Nome</label>
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
@@ -84,9 +84,9 @@ export default function Profile() {
             <input value={user?.email || ''} disabled />
           </div>
 
-          <h2>Endereço padrão</h2>
+          <h2 className="form-section-title">Endereço padrão</h2>
           <p className="form-hint">Salvo para pré-preencher checkout e calcular frete no carrinho.</p>
-          <div className="form-row-2">
+          <div className="form-row form-row--2">
             <div className="form-group">
               <label>CEP</label>
               <input value={form.shipping_zip} onChange={(e) => setForm({ ...form, shipping_zip: e.target.value })} placeholder="00000-000" />
@@ -106,12 +106,26 @@ export default function Profile() {
           </div>
 
           <div className="profile-actions">
-            <button type="submit" className="btn btn-accent">Salvar</button>
-            <button type="button" className="btn btn-secondary" onClick={handleLogout}>Sair</button>
-            <Link to="/pedidos/" className="btn btn-secondary">Meus pedidos</Link>
+            <button type="submit" className="btn btn-accent">Salvar alterações</button>
+            <button type="button" className="btn btn-secondary" onClick={handleLogout}>Sair da conta</button>
+            {!accountEmbedded && <Link to="/conta/pedidos/" className="btn btn-secondary">Meus pedidos</Link>}
             {user?.is_staff && <Link to="/gerenciar/" className="btn btn-secondary">Gerenciar peças</Link>}
           </div>
-        </form>
+      </div>
+    </form>
+  );
+
+  if (accountEmbedded) return formContent;
+
+  return (
+    <>
+      <PageSeo title="Minha conta | Galelugi Peças" description="Gerencie seus dados e endereço de entrega na Galelugi." />
+      <div className="wrap internal-page profile-page">
+        <header className="internal-page-head">
+          <h1>Minha conta</h1>
+          <p>Dados usados no checkout e cálculo de frete.</p>
+        </header>
+        {formContent}
       </div>
     </>
   );

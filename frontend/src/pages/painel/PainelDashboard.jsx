@@ -45,6 +45,19 @@ export function PainelDashboard() {
         <article><strong>{t.orders_approved || 0}</strong><span>Pedidos pagos</span></article>
         <article><strong>{t.products || 0}</strong><span>Peças ativas</span></article>
       </div>
+      {data.part_requests && (
+        <>
+          <h2>Pedidos de peça (30d)</h2>
+          <div className="painel-stats">
+            <article><strong>{data.part_requests.total || 0}</strong><span>Criados</span></article>
+            <article><strong>{data.part_requests.open || 0}</strong><span>Abertos</span></article>
+            <article><strong>{data.part_requests.fulfilled || 0}</strong><span>Atendidos</span></article>
+            <article><strong>{data.part_requests.fulfillment_rate || 0}%</strong><span>Taxa atendimento</span></article>
+            <article><strong>{data.part_requests.avg_rating || '—'}</strong><span>Nota média</span></article>
+            <article><strong>{data.part_requests.avg_first_response_hours ?? '—'}h</strong><span>1ª resposta</span></article>
+          </div>
+        </>
+      )}
       <h2>Pedidos recentes</h2>
       <div className="painel-table">
         {(data.recent_orders || []).map((o) => (

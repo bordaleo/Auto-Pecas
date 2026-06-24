@@ -27,7 +27,7 @@ const STEPS = [
 
 export default function HowItWorks() {
   const { config } = useStore();
-  const commission = config.marketplace_commission_percent || 12;
+  const commission = config.marketplace_commission_percent || 8;
   const freeMin = Number(config.free_shipping_min || 299);
 
   return (

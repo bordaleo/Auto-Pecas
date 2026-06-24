@@ -12,7 +12,7 @@ const BENEFITS = [
     icon: '👤',
     title: 'Entre na sua conta',
     desc: 'Aproveite ofertas para comprar tudo que quiser.',
-    href: '/perfil/',
+    href: '/conta/perfil/',
     cta: 'Entrar na sua conta',
   },
   {

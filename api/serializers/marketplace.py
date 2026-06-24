@@ -137,7 +137,7 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReturnRequest
         fields = [
-            'id', 'order_id', 'product_name', 'reason', 'description', 'status',
+            'id', 'order_id', 'order_item_id', 'product_name', 'reason', 'description', 'status',
             'status_display', 'seller_response', 'refund_amount', 'return_tracking_code',
             'created_at', 'updated_at',
         ]

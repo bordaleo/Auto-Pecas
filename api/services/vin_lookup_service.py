@@ -31,8 +31,10 @@ VIN_WMI_BRANDS = {
 BRAND_ALIASES = {
     'vw': 'Volkswagen',
     'volkswagen': 'Volkswagen',
+    'volks': 'Volkswagen',
     'gm': 'Chevrolet',
     'chevrolet': 'Chevrolet',
+    'chevy': 'Chevrolet',
     'fiat': 'Fiat',
     'ford': 'Ford',
     'honda': 'Honda',
@@ -40,7 +42,77 @@ BRAND_ALIASES = {
     'renault': 'Renault',
     'hyundai': 'Hyundai',
     'nissan': 'Nissan',
+    'jeep': 'Jeep',
+    'bmw': 'BMW',
+    'mercedes': 'Mercedes-Benz',
+    'mercedes-benz': 'Mercedes-Benz',
+    'audi': 'Audi',
+    'peugeot': 'Peugeot',
+    'citroen': 'Citroen',
+    'citroën': 'Citroen',
+    'kia': 'Kia',
+    'mitsubishi': 'Mitsubishi',
+    'chery': 'Chery',
+    'ram': 'RAM',
 }
+
+
+def _normalize_match_text(text: str) -> str:
+    text = (text or '').lower()
+    text = re.sub(r'[^a-z0-9\s-]', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+def _model_match_score(db_name: str, hint: str) -> int:
+    db = _normalize_match_text(db_name)
+    h = _normalize_match_text(hint)
+    if not h or not db:
+        return 0
+    if db == h:
+        return 100
+    if h in db:
+        return 92
+    if db in h:
+        return 88
+    db_parts = db.split()
+    h_parts = h.split()
+    if db_parts[0] == h_parts[0]:
+        return 78
+    if db_parts[0].startswith(h_parts[0]) or h_parts[0].startswith(db_parts[0]):
+        return 68
+    if any(part in db for part in h_parts if len(part) >= 3):
+        return 55
+    return 0
+
+
+def _clean_model_hint(raw: str) -> str:
+    name = (raw or '').strip()
+    if '/' in name:
+        name = name.split('/')[-1]
+    name = re.sub(r'^(VW|GM|FORD|MERCEDES|BMW|AUDI)\s*[-/]?\s*', '', name, flags=re.I)
+    name = re.sub(r'\s+\d[\d,.]*.*$', '', name)
+    name = re.sub(
+        r'\s+(Flex|Gasolina|Diesel|Híbrido|Hibrido|Elétrico|Eletrico|Manual|Automático|Automatico).*$',
+        '',
+        name,
+        flags=re.I,
+    )
+    name = name.strip(' -/')
+    return name or raw.strip()
+
+
+def _parse_plate_brand_model(marca: str, modelo: str) -> tuple[str, str]:
+    marca = (marca or '').strip()
+    modelo = _clean_model_hint(modelo or '')
+    if '/' in (marca or ''):
+        parts = marca.split('/', 1)
+        marca, extra = parts[0], parts[1]
+        if not modelo:
+            modelo = _clean_model_hint(extra)
+    if '/' in modelo:
+        modelo = _clean_model_hint(modelo.split('/')[-1])
+    return marca, modelo
 
 
 def normalize_vin(vin: str) -> str:
@@ -108,36 +180,43 @@ def _resolve_brand(name: str) -> VehicleBrand | None:
 
 
 def _match_vehicle_models(brand_name: str, model_name: str, year: int | None) -> list[dict]:
-    brand = _resolve_brand(brand_name)
-    base_model = (model_name or brand_name or '').strip().split()[0] if (model_name or brand_name) else ''
+    marca, modelo = _parse_plate_brand_model(brand_name, model_name)
+    brand = _resolve_brand(marca)
+    clean_model = _clean_model_hint(modelo or model_name or '')
 
-    if not brand and base_model:
+    if not brand and clean_model:
         vm = VehicleModel.objects.filter(
-            name__icontains=base_model, is_active=True,
+            name__icontains=clean_model.split()[0], is_active=True,
         ).select_related('brand').first()
         if vm:
             brand = vm.brand
 
-    if not brand and model_name:
-        brand = _resolve_brand(model_name.split()[0])
+    if not brand and marca:
+        brand = _resolve_brand(marca.split()[0])
 
     if not brand:
         return []
 
-    if base_model and base_model.lower() not in BRAND_ALIASES:
-        qs = VehicleModel.objects.filter(brand=brand, is_active=True, name__icontains=base_model)
-    else:
-        qs = VehicleModel.objects.filter(brand=brand, is_active=True)
-
+    qs = VehicleModel.objects.filter(brand=brand, is_active=True).select_related('brand')
     if year:
         by_year = qs.filter(year_start__lte=year, year_end__gte=year)
         if by_year.exists():
-            return _model_values(by_year.order_by('-year_end'))
-        closest = qs.order_by('-year_end').first()
-        if closest:
-            return _model_values(VehicleModel.objects.filter(pk=closest.pk))
+            qs = by_year
 
-    return _model_values(qs.order_by('name', '-year_end')[:5])
+    if clean_model and clean_model.lower() not in BRAND_ALIASES:
+        scored = []
+        for vm in qs:
+            score = _model_match_score(vm.name, clean_model)
+            if score >= 55:
+                scored.append((score, vm))
+        if not scored:
+            for vm in qs.filter(name__icontains=clean_model.split()[0]):
+                scored.append((_model_match_score(vm.name, clean_model), vm))
+        scored.sort(key=lambda x: (-x[0], x[1].name))
+        if scored:
+            return _model_values([vm for _, vm in scored[:8]])
+
+    return _model_values(qs.order_by('name', '-year_end')[:8])
 
 
 def _apply_year_override(result: dict, year_override) -> dict:
@@ -236,6 +315,7 @@ def lookup_plate(plate: str, *, year_override=None) -> dict:
 
     marca = data['marca']
     modelo = data['modelo']
+    marca, modelo = _parse_plate_brand_model(marca, modelo)
     year_estimated = bool(data.get('estimado'))
     year = _parse_year(year_override) if year_override else data.get('ano')
 
@@ -335,14 +415,25 @@ def find_products_for_vehicle(model_ids: list[int], limit: int = 48, *, brand_hi
     if products:
         return products
 
+    from api.services.product_search_service import apply_text_search
+
+    qs = Product.objects.filter(is_active=True).select_related('category', 'seller')
+    search_text = ' '.join(filter(None, [_clean_model_hint(model_hint), brand_hint])).strip()
+    if search_text:
+        qs = apply_text_search(qs, search_text)
+        products = list(qs.distinct()[:limit])
+        if products:
+            return products
+
     tokens = []
-    if model_hint:
-        tokens.append(model_hint.split()[0])
+    clean_model = _clean_model_hint(model_hint)
+    if clean_model:
+        tokens.append(clean_model.split()[0])
     if brand_hint:
         tokens.append(brand_hint.split()[0])
         alias = BRAND_ALIASES.get(brand_hint.lower())
         if alias:
-            tokens.append('VW' if alias == 'Volkswagen' else alias[:3])
+            tokens.append('VW' if alias == 'Volkswagen' else alias[:4])
 
     if not tokens:
         return []
@@ -354,6 +445,7 @@ def find_products_for_vehicle(model_ids: list[int], limit: int = 48, *, brand_hi
         q |= Q(name__icontains=token)
         q |= Q(compatible_vehicles__icontains=token)
         q |= Q(brand__icontains=token)
+        q |= Q(description__icontains=token)
 
     if not q:
         return []

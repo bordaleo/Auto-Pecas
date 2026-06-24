@@ -110,7 +110,7 @@ export default function Cart() {
             />
             {!user?.shipping_zip && (
               <p className="form-hint">
-                <Link to="/perfil/">Salve seu CEP no perfil</Link> para pré-preencher no checkout.
+                <Link to="/conta/perfil/">Salve seu CEP no perfil</Link> para pré-preencher no checkout.
               </p>
             )}
           </div>

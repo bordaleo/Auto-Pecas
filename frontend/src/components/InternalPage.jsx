@@ -5,7 +5,7 @@ export default function InternalPage({ title, subtitle, children }) {
         <h1>{title}</h1>
         {subtitle && <p>{subtitle}</p>}
       </header>
-      <div className="internal-page-body">
+      <div className="internal-page-card internal-page-body">
         {children}
       </div>
     </div>

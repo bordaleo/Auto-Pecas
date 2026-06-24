@@ -7,8 +7,11 @@ import SellerOrdersPanel from '../components/seller/SellerOrdersPanel';
 import SellerPayoutsPanel from '../components/seller/SellerPayoutsPanel';
 import SellerReturnsPanel from '../components/seller/SellerReturnsPanel';
 import SellerChatPanel from '../components/seller/SellerChatPanel';
+import SellerPartRequestsPanel from '../components/seller/SellerPartRequestsPanel';
 import SellerAnalyticsPanel, { SellerCsvImportPanel, SellerInvoicesPanel } from '../components/seller/SellerAnalyticsPanel';
 import VehicleCompatibilityPicker from '../components/VehicleCompatibilityPicker';
+import HubLayout from '../components/ui/HubLayout';
+import PageLoader from '../components/ui/PageLoader';
 
 const EMPTY_FORM = {
   name: '', description: '', sku: '', oem_code: '', brand: '',
@@ -37,10 +40,13 @@ export default function SellerHub() {
   });
   const [preview, setPreview] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  const [tab, setTab] = useState('products');
+  const [section, setSection] = useState('products');
+  const [subTab, setSubTab] = useState('orders');
+  const [showImport, setShowImport] = useState(false);
+  const [requestStats, setRequestStats] = useState({ unresponded_count: 0 });
   const [selectedVehicleModels, setSelectedVehicleModels] = useState([]);
 
-  const commission = Number(config.marketplace_commission_percent || 12);
+  const commission = Number(config.marketplace_commission_percent || 8);
 
   const load = async () => {
     if (!getToken()) { setLoading(false); return; }
@@ -60,6 +66,9 @@ export default function SellerHub() {
       ]);
       setCategories(productList(cats));
       setProducts(prods);
+      if (me.status === 'active') {
+        api('/seller/part-requests/stats/').then(setRequestStats).catch(() => {});
+      }
     } catch {
       setSeller(null);
     } finally {
@@ -97,7 +106,7 @@ export default function SellerHub() {
     );
   }
 
-  if (loading) return <div className="wrap"><p className="state-empty">Carregando...</p></div>;
+  if (loading) return <div className="wrap"><PageLoader /></div>;
 
   if (!seller) {
     return (
@@ -116,7 +125,7 @@ export default function SellerHub() {
               <li>Comissão transparente: <strong>{commission}%</strong> por venda</li>
             </ul>
           </div>
-          <form className="seller-form-card" onSubmit={async (e) => {
+          <form className="form-card" onSubmit={async (e) => {
             e.preventDefault();
             const stock = parseInt(applyForm.estimated_stock_units, 10);
             if (!stock || stock < 1) {
@@ -136,8 +145,11 @@ export default function SellerHub() {
               load();
             } catch (err) { showToast(err.message); }
           }}>
-            <h2>Cadastrar loja</h2>
-            <p className="form-hint">Preencha com dados reais. Usamos essas informações para calcular frete e aprovar sua loja.</p>
+            <header className="form-card-head">
+              <h2>Cadastrar loja</h2>
+              <p className="form-hint">Preencha com dados reais. Usamos essas informações para calcular frete e aprovar sua loja.</p>
+            </header>
+            <div className="form-card-body">
             <div className="form-group">
               <label>Nome da loja *</label>
               <input value={applyForm.store_name} onChange={(e) => setApplyForm({ ...applyForm, store_name: e.target.value })} required />
@@ -158,7 +170,7 @@ export default function SellerHub() {
               <label>Endereço de envio</label>
               <input value={applyForm.shipping_address} onChange={(e) => setApplyForm({ ...applyForm, shipping_address: e.target.value })} />
             </div>
-            <div className="form-row-2">
+            <div className="form-row form-row--2">
               <div className="form-group">
                 <label>Cidade</label>
                 <input value={applyForm.shipping_city} onChange={(e) => setApplyForm({ ...applyForm, shipping_city: e.target.value })} />
@@ -184,7 +196,10 @@ export default function SellerHub() {
               <label>Sobre sua loja</label>
               <textarea rows={3} value={applyForm.description} onChange={(e) => setApplyForm({ ...applyForm, description: e.target.value })} />
             </div>
-            <button type="submit" className="btn btn-accent btn-full">Enviar cadastro</button>
+            <footer className="form-card-foot">
+              <button type="submit" className="btn btn-accent">Enviar cadastro</button>
+            </footer>
+            </div>
           </form>
         </div>
       </div>
@@ -201,7 +216,7 @@ export default function SellerHub() {
             Aprovação rápida — em geral no mesmo dia útil. Você receberá acesso completo assim que aprovada.
             {seller.estimated_stock_units ? ` Estoque informado: ~${seller.estimated_stock_units} peças.` : ''}
           </p>
-          <Link to="/perfil/" className="btn btn-secondary">Ir para minha conta</Link>
+          <Link to="/conta/" className="btn btn-secondary">Ir para minha conta</Link>
         </div>
       </div>
     );
@@ -325,60 +340,63 @@ export default function SellerHub() {
 
   const stats = seller.stats || {};
 
+  const sellerNav = [
+    { key: 'products', label: 'Peças e estoque' },
+    { key: 'sales', label: 'Vendas' },
+    { key: 'support', label: 'Atendimento', badge: requestStats.unresponded_count || 0 },
+    { key: 'finance', label: 'Financeiro' },
+    { key: 'settings', label: 'Configurações' },
+  ];
+
+  const handleSection = (key) => {
+    setSection(key);
+    if (key === 'sales') setSubTab('orders');
+    if (key === 'support') setSubTab('requests');
+    if (key === 'finance') setSubTab('payouts');
+  };
+
+  const salesTabs = [['orders', 'Pedidos'], ['returns', 'Devoluções']];
+  const supportTabs = [['requests', 'Solicitações', requestStats.unresponded_count || 0], ['chat', 'Mensagens']];
+  const financeTabs = [['payouts', 'Repasses'], ['analytics', 'Relatórios'], ['invoices', 'NF-e']];
+
+  const subTabs = section === 'sales' ? salesTabs : section === 'support' ? supportTabs : section === 'finance' ? financeTabs : [];
+
   return (
     <div className="wrap seller-hub">
-      <div className="seller-dash-head">
-        <div>
-          <span className="eyebrow">Minha loja</span>
-          <h1>
+      <div className="seller-stats seller-stats--compact">
+        <article><strong>{stats.products_active || 0}</strong><span>Peças ativas</span></article>
+        <article><strong>{formatCurrency(stats.sales_earnings || 0)}</strong><span>Faturamento</span></article>
+        <article><strong>{formatCurrency(seller.balance_available || 0)}</strong><span>Saldo</span></article>
+      </div>
+
+      <HubLayout
+        eyebrow="Minha loja"
+        title={(
+          <>
             {seller.store_name}
             {seller.is_official && <span className="store-badge store-badge--lg">Oficial</span>}
-          </h1>
-          <p>Comissão Galelugi: <strong>{seller.commission_rate_default || commission}%</strong> por venda</p>
-        </div>
-        <Link to={`/loja/${seller.slug}/`} className="btn btn-secondary">Ver vitrine pública</Link>
-      </div>
+          </>
+        )}
+        subtitle={`Comissão Galelugi: ${seller.commission_rate_default || commission}% por venda`}
+        actions={<Link to={`/loja/${seller.slug}/`} className="btn btn-secondary btn-sm">Ver vitrine</Link>}
+        nav={sellerNav}
+        activeKey={section}
+        onNavChange={handleSection}
+        subTabs={subTabs}
+        activeSubTab={subTab}
+        onSubTabChange={setSubTab}
+      >
+        {section === 'sales' && subTab === 'orders' && <SellerOrdersPanel />}
+        {section === 'sales' && subTab === 'returns' && <SellerReturnsPanel />}
+        {section === 'support' && subTab === 'requests' && <SellerPartRequestsPanel />}
+        {section === 'support' && subTab === 'chat' && <SellerChatPanel />}
+        {section === 'finance' && subTab === 'payouts' && <SellerPayoutsPanel />}
+        {section === 'finance' && subTab === 'analytics' && <SellerAnalyticsPanel />}
+        {section === 'finance' && subTab === 'invoices' && <SellerInvoicesPanel />}
 
-      <div className="seller-stats">
-        <article><strong>{stats.products_active || 0}</strong><span>Peças ativas</span></article>
-        <article><strong>{formatCurrency(stats.sales_earnings || 0)}</strong><span>Seu faturamento</span></article>
-        <article><strong>{formatCurrency(seller.balance_available || 0)}</strong><span>Saldo disponível</span></article>
-      </div>
-
-      <div className="seller-tabs">
-        {[
-          ['products', 'Peças'],
-          ['shipping', 'Frete e endereço'],
-          ['orders', 'Pedidos'],
-          ['payouts', 'Repasses'],
-          ['returns', 'Devoluções'],
-          ['chat', 'Mensagens'],
-          ['analytics', 'Analytics'],
-          ['import', 'Importar CSV'],
-          ['invoices', 'NF-e'],
-        ].map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            className={`seller-tab${tab === key ? ' active' : ''}`}
-            onClick={() => setTab(key)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'orders' && <SellerOrdersPanel />}
-      {tab === 'payouts' && <SellerPayoutsPanel />}
-      {tab === 'returns' && <SellerReturnsPanel />}
-      {tab === 'chat' && <SellerChatPanel />}
-      {tab === 'analytics' && <SellerAnalyticsPanel />}
-      {tab === 'import' && <SellerCsvImportPanel />}
-      {tab === 'invoices' && <SellerInvoicesPanel />}
-
-      {tab === 'shipping' && (
+        {section === 'settings' && (
         <form
-          className="seller-form-card"
+          className="form-card"
           onSubmit={async (e) => {
             e.preventDefault();
             try {
@@ -393,11 +411,14 @@ export default function SellerHub() {
             }
           }}
         >
-          <h2>Frete e endereço de origem</h2>
-          <p className="form-hint">
-            O frete do cliente é calculado a partir do CEP informado abaixo,
-            ou do endereço da Sandroni se você usar envio pela plataforma.
-          </p>
+          <header className="form-card-head">
+            <h2>Frete e endereço de origem</h2>
+            <p className="form-hint">
+              O frete do cliente é calculado a partir do CEP informado abaixo,
+              ou do endereço da Sandroni se você usar envio pela plataforma.
+            </p>
+          </header>
+          <div className="form-card-body">
           <label className="checkbox-row">
             <input
               type="checkbox"
@@ -424,7 +445,7 @@ export default function SellerHub() {
                   onChange={(e) => setShippingForm({ ...shippingForm, shipping_address: e.target.value })}
                 />
               </div>
-              <div className="form-row-2">
+              <div className="form-row form-row--2">
                 <div className="form-group">
                   <label>Cidade</label>
                   <input
@@ -443,19 +464,40 @@ export default function SellerHub() {
               </div>
             </>
           )}
-          <button type="submit" className="btn btn-accent">Salvar configurações de frete</button>
+          <footer className="form-card-foot">
+            <button type="submit" className="btn btn-accent">Salvar configurações de frete</button>
+          </footer>
+          </div>
         </form>
-      )}
+        )}
 
-      {tab === 'products' && (
+        {section === 'products' && (
       <div className="seller-grid">
-        <form className="seller-form-card" onSubmit={handleSubmit}>
-          <h2>{editingId ? 'Editar peça' : 'Publicar nova peça'}</h2>
+        <div className="seller-products-toolbar">
+          <p className="form-hint">Publique peças com foto real e compatibilidade veicular.</p>
+          <button
+            type="button"
+            className={`btn btn-secondary btn-sm${showImport ? ' active' : ''}`}
+            onClick={() => setShowImport((v) => !v)}
+          >
+            {showImport ? 'Fechar importação' : 'Importar CSV'}
+          </button>
+        </div>
+        {showImport && (
+          <div className="form-card" style={{ gridColumn: '1 / -1' }}>
+            <SellerCsvImportPanel />
+          </div>
+        )}
+        <form className="form-card" onSubmit={handleSubmit}>
+          <header className="form-card-head">
+            <h2>{editingId ? 'Editar peça' : 'Publicar nova peça'}</h2>
+          </header>
+          <div className="form-card-body">
           <div className="form-group">
             <label>Nome *</label>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           </div>
-          <div className="form-row-2">
+          <div className="form-row form-row--2">
             <div className="form-group">
               <label>Preço de venda (R$) *</label>
               <input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required />
@@ -472,7 +514,7 @@ export default function SellerHub() {
               <div className="commission-preview-total"><span>Você recebe</span><strong>{formatCurrency(preview.seller_earning)}</strong></div>
             </div>
           )}
-          <div className="form-row-2">
+          <div className="form-row form-row--2">
             <div className="form-group">
               <label>Condição</label>
               <select value={form.part_condition} onChange={(e) => setForm({ ...form, part_condition: e.target.value })}>
@@ -498,7 +540,7 @@ export default function SellerHub() {
             <label>Marca</label>
             <input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
           </div>
-          <div className="form-row-2">
+          <div className="form-row form-row--2">
             <div className="form-group">
               <label>SKU</label>
               <input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
@@ -532,16 +574,22 @@ export default function SellerHub() {
             <label>Upload de foto *</label>
             <input type="file" accept="image/*" onChange={handleUpload} required={!form.image_url} />
           </div>
+          <footer className="form-card-foot">
           {editingId && (
-            <button type="button" className="btn btn-secondary btn-full" style={{ marginBottom: '0.5rem' }} onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setSelectedVehicleModels([]); }}>
+            <button type="button" className="btn btn-secondary" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setSelectedVehicleModels([]); }}>
               Cancelar edição
             </button>
           )}
-          <button type="submit" className="btn btn-accent btn-full">{editingId ? 'Salvar alterações' : 'Publicar peça'}</button>
+          <button type="submit" className="btn btn-accent">{editingId ? 'Salvar alterações' : 'Publicar peça'}</button>
+          </footer>
+          </div>
         </form>
 
-        <div className="seller-form-card">
-          <h2>Minhas peças ({products.length})</h2>
+        <div className="form-card">
+          <header className="form-card-head">
+            <h2>Minhas peças ({products.length})</h2>
+          </header>
+          <div className="form-card-body">
           {products.length === 0 ? (
             <p className="state-empty" style={{ padding: '1.5rem 0' }}>Nenhuma peça publicada ainda.</p>
           ) : (
@@ -567,9 +615,11 @@ export default function SellerHub() {
               ))}
             </div>
           )}
+          </div>
         </div>
       </div>
-      )}
+        )}
+      </HubLayout>
     </div>
   );
 }

@@ -657,7 +657,7 @@ class SystemConfig(models.Model):
     marketplace_commission_percent = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        default=Decimal('12.00'),
+        default=Decimal('8.00'),
         verbose_name='Comissão do marketplace (%)',
         help_text='Percentual retido pela Galelugi em cada venda de vendedor',
     )
@@ -1048,6 +1048,126 @@ class ProductMessage(models.Model):
         return f'Msg #{self.id} — {self.sender.email}'
 
 
+class PartRequestStatus(models.TextChoices):
+    OPEN = 'open', 'Aberta'
+    CLOSED = 'closed', 'Encerrada'
+    FULFILLED = 'fulfilled', 'Atendida'
+
+
+class PartRequest(models.Model):
+    """Pedido de peça público — cliente não encontrou no catálogo."""
+    requester = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='part_requests', verbose_name='Solicitante',
+    )
+    description = models.TextField(verbose_name='Descrição da peça')
+    vehicle_brand = models.CharField(max_length=80, blank=True, default='', verbose_name='Marca do veículo')
+    vehicle_model = models.CharField(max_length=120, blank=True, default='', verbose_name='Modelo do veículo')
+    vehicle_year = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name='Ano do veículo')
+    vehicle_model_ref = models.ForeignKey(
+        'VehicleModel', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='part_requests', verbose_name='Modelo veicular (catálogo)',
+    )
+    plate = models.CharField(max_length=12, blank=True, default='', verbose_name='Placa')
+    vin = models.CharField(max_length=17, blank=True, default='', verbose_name='VIN')
+    requester_zip = models.CharField(max_length=12, blank=True, default='', verbose_name='CEP solicitante')
+    contact_phone = models.CharField(max_length=20, blank=True, default='', verbose_name='Telefone para contato')
+    show_phone = models.BooleanField(default=True, verbose_name='Exibir telefone aos vendedores')
+    status = models.CharField(
+        max_length=20, choices=PartRequestStatus.choices,
+        default=PartRequestStatus.OPEN, db_index=True,
+    )
+    expires_at = models.DateTimeField(null=True, blank=True, verbose_name='Expira em')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+    closed_at = models.DateTimeField(null=True, blank=True, verbose_name='Encerrada em')
+
+    class Meta:
+        verbose_name = 'Pedido de peça'
+        verbose_name_plural = 'Pedidos de peça'
+        db_table = 'part_requests'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Pedido #{self.id} — {self.description[:60]}'
+
+
+class PartRequestConversation(models.Model):
+    """Conversa vendedor ↔ solicitante sobre um pedido de peça."""
+    part_request = models.ForeignKey(
+        PartRequest, on_delete=models.CASCADE, related_name='conversations', verbose_name='Pedido',
+    )
+    seller = models.ForeignKey(
+        Seller, on_delete=models.CASCADE, related_name='part_request_conversations', verbose_name='Vendedor',
+    )
+    buyer = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='part_request_conversations', verbose_name='Solicitante',
+    )
+    quote_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Preço orçado',
+    )
+    quote_condition = models.CharField(
+        max_length=20, blank=True, default='', verbose_name='Condição orçada',
+    )
+    quote_delivery_days = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Prazo entrega (dias úteis)',
+    )
+    quote_product = models.ForeignKey(
+        Product, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='part_request_quotes', verbose_name='Peça vinculada',
+    )
+    quote_notes = models.TextField(blank=True, default='', verbose_name='Observações do orçamento')
+    last_message_at = models.DateTimeField(auto_now_add=True, verbose_name='Última mensagem')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
+
+    class Meta:
+        verbose_name = 'Conversa sobre pedido de peça'
+        verbose_name_plural = 'Conversas sobre pedidos de peça'
+        db_table = 'part_request_conversations'
+        unique_together = [['part_request', 'seller']]
+        ordering = ['-last_message_at']
+
+    def __str__(self):
+        return f'Pedido #{self.part_request_id} — {self.seller.store_name}'
+
+
+class PartRequestMessage(models.Model):
+    conversation = models.ForeignKey(
+        PartRequestConversation, on_delete=models.CASCADE, related_name='messages', verbose_name='Conversa',
+    )
+    sender = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='part_request_messages', verbose_name='Remetente',
+    )
+    body = models.TextField(verbose_name='Mensagem')
+    is_read = models.BooleanField(default=False, verbose_name='Lida')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Enviada em')
+
+    class Meta:
+        verbose_name = 'Mensagem (pedido de peça)'
+        verbose_name_plural = 'Mensagens (pedido de peça)'
+        db_table = 'part_request_messages'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'Msg pedido #{self.conversation.part_request_id} — {self.sender.email}'
+
+
+class PartRequestRating(models.Model):
+    """Avaliação do atendimento ao pedido de peça."""
+    conversation = models.OneToOneField(
+        PartRequestConversation, on_delete=models.CASCADE, related_name='rating', verbose_name='Conversa',
+    )
+    rating = models.PositiveSmallIntegerField(verbose_name='Nota (1-5)')
+    comment = models.TextField(blank=True, default='', verbose_name='Comentário')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Avaliado em')
+
+    class Meta:
+        verbose_name = 'Avaliação de pedido de peça'
+        verbose_name_plural = 'Avaliações de pedidos de peça'
+        db_table = 'part_request_ratings'
+
+    def __str__(self):
+        return f'{self.rating}★ — pedido #{self.conversation.part_request_id}'
+
+
 class NotificationType(models.TextChoices):
     ORDER_PAID = 'order_paid', 'Pagamento confirmado'
     ORDER_SHIPPED = 'order_shipped', 'Pedido enviado'
@@ -1059,6 +1179,9 @@ class NotificationType(models.TextChoices):
     PAYOUT_PAID = 'payout_paid', 'Saque pago'
     INVOICE_ISSUED = 'invoice_issued', 'Nota fiscal emitida'
     INVOICE_REQUESTED = 'invoice_requested', 'NF-e solicitada'
+    PART_REQUEST_NEW = 'part_request_new', 'Novo pedido de peça'
+    PART_REQUEST_RESPONSE = 'part_request_response', 'Resposta ao pedido de peça'
+    PART_REQUEST_MESSAGE = 'part_request_message', 'Mensagem no pedido de peça'
 
 
 class UserNotification(models.Model):
