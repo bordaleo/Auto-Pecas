@@ -1,6 +1,5 @@
 import { Link, NavLink } from 'react-router-dom';
 import { useStore } from '../../context/StoreContext';
-import { formatCurrency } from '../../api/client';
 import Logo from '../Logo';
 import ThemeToggle from '../ThemeToggle';
 
@@ -39,8 +38,7 @@ function NavIcon({ name }) {
 }
 
 export default function SideNav({ open, onClose }) {
-  const { config, whatsappUrl } = useStore();
-  const freeMin = Number(config.free_shipping_min || 299);
+  const { whatsappUrl } = useStore();
 
   return (
     <>
@@ -115,11 +113,6 @@ export default function SideNav({ open, onClose }) {
 
         <div className="sidebar-theme">
           <ThemeToggle className="theme-toggle--sidebar" showLabel />
-        </div>
-
-        <div className="sidebar-promo">
-          <strong>{config.store_tagline || 'Frete grátis em milhares de peças'}</strong>
-          <span>Em pedidos acima de {formatCurrency(freeMin)}</span>
         </div>
       </aside>
     </>
