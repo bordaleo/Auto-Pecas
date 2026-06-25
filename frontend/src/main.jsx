@@ -6,6 +6,7 @@ import './styles/global.css';
 import './styles/theme.css';
 import './styles/theme-modes.css';
 import './styles/landing.css';
+import './styles/catalog.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

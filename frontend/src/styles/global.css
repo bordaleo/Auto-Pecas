@@ -725,19 +725,18 @@ button, input, select, textarea { font: inherit; }
 }
 .gl-card-media {
   position: relative;
-  aspect-ratio: 1;
-  padding: 1rem;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(145deg, #C9BFB3 0%, #B5A898 100%);
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  display: block;
+  background: #fff;
+  border-bottom: 1px solid var(--gl-border);
 }
-.gl-card-media img {
+.gl-card-media img,
+.gl-card-media .product-image {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  transition: transform 0.2s;
 }
-.gl-card:hover .gl-card-media img { transform: scale(1.04); }
+.gl-card:hover .gl-card-media .product-image--photo { transform: scale(1.03); }
 .gl-card-ph { font-size: 2.5rem; opacity: 0.2; }
 .gl-card-tag {
   position: absolute;
@@ -1554,6 +1553,88 @@ button, input, select, textarea { font: inherit; }
 .vehicle-model-option { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
 .vehicle-compat-picker .field-hint { font-size: 0.82rem; color: rgba(0,0,0,.55); margin: 0 0 0.5rem; }
 .vehicle-compat-picker .field-hint-warn { color: #b45309; }
+.vehicle-selected-count { display: block; width: 100%; font-size: 0.75rem; font-weight: 700; color: var(--gl-muted); margin-bottom: 0.35rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.vehicle-compat-adder {
+  margin: 0.75rem 0 1rem;
+  padding: 1rem;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: #fafafa;
+}
+.vehicle-compat-adder__head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--gl-midnight);
+  margin-bottom: 0.75rem;
+}
+.vehicle-compat-adder__flash {
+  margin: 0 0 0.65rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  background: #d1fae5;
+  color: #047857;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.vehicle-selector__progress--compact { margin-bottom: 0.65rem; }
+.vehicle-compat-search { margin-top: 1rem; }
+.vehicle-compat-search label { display: block; font-size: 0.82rem; font-weight: 700; margin-bottom: 0.4rem; }
+.vehicle-compat-search__input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: #fff;
+}
+.vehicle-compat-search__input-wrap input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.65rem 0;
+  font-size: 0.9rem;
+  outline: none;
+}
+.vehicle-compat-search__actions { margin: 0.5rem 0 0.35rem; }
+.vehicle-compat-search__results { margin-top: 0.35rem; max-height: 220px; }
+.vehicle-compat-years { margin-top: 0.5rem; }
+.vehicle-compat-years--inline { margin-top: 0.75rem; padding: 0.85rem; border: 1px solid var(--gl-border); border-radius: 10px; background: #fff; }
+.vehicle-compat-years__toolbar { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-bottom: 0.5rem; }
+.vehicle-compat-years__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.2rem, 1fr));
+  gap: 0.35rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: #fff;
+  margin-bottom: 0.65rem;
+}
+.vehicle-compat-years__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.35rem;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #fafafa;
+}
+.vehicle-compat-years__item:has(input:checked) {
+  border-color: var(--gl-accent);
+  background: rgba(232, 98, 26, 0.1);
+}
+.vehicle-compat-years__item input { margin: 0; }
+.vehicle-compat-years__actions { display: grid; gap: 0.45rem; }
 .vehicle-compat-toolbar { display: grid; grid-template-columns: 1fr 180px; gap: 0.75rem; margin-bottom: 0.75rem; }
 .vehicle-brand-list { display: grid; gap: 0.5rem; max-height: 360px; overflow: auto; }
 .vehicle-brand-section { border: 1px solid var(--gl-border); border-radius: 10px; overflow: hidden; background: #fff; }

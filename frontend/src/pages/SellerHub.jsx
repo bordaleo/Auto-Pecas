@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { api, formatCurrency, getToken, productList } from '../api/client';
+import { vehicleModelsToCompat } from '../utils/vehicleCompat';
 import { useStore } from '../context/StoreContext';
 import { useToast } from '../context/ToastContext';
 import SellerOrdersPanel from '../components/seller/SellerOrdersPanel';
@@ -44,7 +45,7 @@ export default function SellerHub() {
   const [subTab, setSubTab] = useState('orders');
   const [showImport, setShowImport] = useState(false);
   const [requestStats, setRequestStats] = useState({ unresponded_count: 0 });
-  const [selectedVehicleModels, setSelectedVehicleModels] = useState([]);
+  const [selectedVehicleCompat, setSelectedVehicleCompat] = useState([]);
 
   const commission = Number(config.marketplace_commission_percent || 8);
 
@@ -265,10 +266,15 @@ export default function SellerHub() {
       showToast('Envie uma foto real da peça antes de publicar.');
       return;
     }
-    if (selectedVehicleModels.length === 0) {
+    if (selectedVehicleCompat.length === 0) {
       showToast('Selecione ao menos um veículo compatível.');
       return;
     }
+    const vehicle_compatibility = selectedVehicleCompat.map((e) => ({
+      model_id: e.model_id,
+      year_start: e.year_start,
+      year_end: e.year_end,
+    }));
     try {
       if (editingId) {
         await api(`/seller/products/${editingId}/`, {
@@ -279,7 +285,7 @@ export default function SellerHub() {
             stock: parseInt(form.stock, 10),
             warranty_days: parseInt(form.warranty_days, 10) || 90,
             category: form.category || null,
-            vehicle_model_ids: selectedVehicleModels,
+            vehicle_compatibility,
           }),
         });
         showToast('Peça atualizada!');
@@ -293,13 +299,13 @@ export default function SellerHub() {
             stock: parseInt(form.stock, 10),
             warranty_days: parseInt(form.warranty_days, 10) || 90,
             category: form.category || null,
-            vehicle_model_ids: selectedVehicleModels,
+            vehicle_compatibility,
           }),
         });
         showToast('Peça publicada!');
       }
       setForm(EMPTY_FORM);
-      setSelectedVehicleModels([]);
+      setSelectedVehicleCompat([]);
       load();
     } catch (err) { showToast(err.message); }
   };
@@ -307,7 +313,7 @@ export default function SellerHub() {
   const startEdit = (product) => {
     setEditingId(product.id);
     const vehicleModels = product.vehicle_models || [];
-    setSelectedVehicleModels(vehicleModels.map((v) => v.id));
+    setSelectedVehicleCompat(vehicleModelsToCompat(vehicleModels));
     setForm({
       name: product.name || '',
       description: product.description || '',
@@ -558,8 +564,8 @@ export default function SellerHub() {
             </select>
           </div>
           <VehicleCompatibilityPicker
-            selectedIds={selectedVehicleModels}
-            onChange={setSelectedVehicleModels}
+            selectedEntries={selectedVehicleCompat}
+            onChange={setSelectedVehicleCompat}
             required
           />
           <div className="form-group">
@@ -576,7 +582,7 @@ export default function SellerHub() {
           </div>
           <footer className="form-card-foot">
           {editingId && (
-            <button type="button" className="btn btn-secondary" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setSelectedVehicleModels([]); }}>
+            <button type="button" className="btn btn-secondary" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setSelectedVehicleCompat([]); }}>
               Cancelar edição
             </button>
           )}

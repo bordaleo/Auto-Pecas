@@ -6,6 +6,7 @@ import { getSavedZip, saveZip } from '../components/ProductCard';
 import ProductReviews from '../components/ProductReviews';
 import ProductChat from '../components/ProductChat';
 import PageSeo from '../components/PageSeo';
+import PageLoader from '../components/ui/PageLoader';
 import { useCart } from '../context/CartContext';
 import { useStore } from '../context/StoreContext';
 import { useToast } from '../context/ToastContext';
@@ -13,6 +14,8 @@ import { useToast } from '../context/ToastContext';
 export default function Product() {
   const { slug } = useParams();
   const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [qty, setQty] = useState(1);
   const [mainImage, setMainImage] = useState('');
   const [zip, setZip] = useState(getSavedZip());
@@ -22,13 +25,21 @@ export default function Product() {
   const { config, whatsappUrl } = useStore();
 
   useEffect(() => {
+    setLoading(true);
+    setNotFound(false);
+    setProduct(null);
+    setQty(1);
     api(`/products/${slug}/`)
       .then((data) => {
         setProduct(data);
         const images = [data.image_url, ...(data.images || []).map((img) => img.url)].filter(Boolean);
         setMainImage(images[0] || '');
       })
-      .catch(() => setProduct(null));
+      .catch(() => {
+        setProduct(null);
+        setNotFound(true);
+      })
+      .finally(() => setLoading(false));
   }, [slug]);
 
   useEffect(() => {
@@ -55,7 +66,11 @@ export default function Product() {
       .catch(() => setShippingLabel('Informe um CEP válido'));
   }, [product, zip, config.free_shipping_min]);
 
-  if (!product) {
+  if (loading) {
+    return <PageLoader label="Carregando peça..." />;
+  }
+
+  if (notFound || !product) {
     return (
       <div className="wrap">
         <p className="empty">Peça não encontrada. <Link to="/pecas/">Ver catálogo</Link></p>
@@ -171,7 +186,12 @@ export default function Product() {
             <strong>Veículos compatíveis:</strong>
             <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
               {product.vehicle_models.map((v) => (
-                <li key={v.id}>{v.brand} {v.name} ({v.year_start}-{v.year_end})</li>
+                <li key={`${v.id}-${v.compat_year_start ?? 'a'}-${v.compat_year_end ?? 'a'}`}>
+                  {v.brand} {v.name}
+                  {v.compat_year_start != null
+                    ? ` (${v.compat_year_start === v.compat_year_end ? v.compat_year_start : `${v.compat_year_start}-${v.compat_year_end}`})`
+                    : ` (${v.year_start}-${v.year_end})`}
+                </li>
               ))}
             </ul>
           </div>

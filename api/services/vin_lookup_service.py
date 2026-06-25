@@ -74,6 +74,9 @@ def _model_match_score(db_name: str, hint: str) -> int:
     if h in db:
         return 92
     if db in h:
+        # Evita confundir Gol com Golf, Fit com Fit... (nomes curtos dentro de outros)
+        if len(db) < 4 and len(h) != len(db):
+            return 0
         return 88
     db_parts = db.split()
     h_parts = h.split()
@@ -164,8 +167,25 @@ def _vin_year_from_code(code: str) -> int | None:
     return mapping.get(code.upper())
 
 
-def _model_values(qs):
-    return list(qs.values('id', 'name', 'slug', 'year_start', 'year_end', brand_slug=F('brand__slug')))
+def _model_values(models_or_qs) -> list[dict]:
+    if hasattr(models_or_qs, 'values'):
+        return list(
+            models_or_qs.values(
+                'id', 'name', 'slug', 'year_start', 'year_end',
+                brand_slug=F('brand__slug'),
+            ),
+        )
+    return [
+        {
+            'id': vm.id,
+            'name': vm.name,
+            'slug': vm.slug,
+            'year_start': vm.year_start,
+            'year_end': vm.year_end,
+            'brand_slug': vm.brand.slug,
+        }
+        for vm in models_or_qs
+    ]
 
 
 def _resolve_brand(name: str) -> VehicleBrand | None:
@@ -232,10 +252,9 @@ def _apply_year_override(result: dict, year_override) -> dict:
     parts = []
     if marca or modelo:
         parts.append(f'{marca} {modelo}'.strip())
-    parts.append(f'ano {year}')
-    if models:
-        parts.append(f'{len(models)} versão(ões) no catálogo')
-    result['message'] = ' · '.join(parts)
+    if year:
+        parts.append(f'Ano {year}')
+    result['message'] = ' · '.join(p for p in parts if p) if parts else 'Veículo identificado'
     return result
 
 
@@ -292,8 +311,7 @@ def decode_vin(vin: str, *, year_override=None) -> dict:
         'vehicle_models': models,
         'message': (
             f'Marca detectada: {brand_hint or "desconhecida"}'
-            + (f', ano ~{year}' if year else '')
-            + (f' · {len(models)} modelo(s) compatível(is)' if models else '')
+            + (f' · Ano {year}' if year else '')
         ),
     }
     if year_override:
@@ -326,15 +344,9 @@ def lookup_plate(plate: str, *, year_override=None) -> dict:
 
     message_parts = [f'{marca} {modelo}'.strip()]
     if year:
-        message_parts.append(f'ano {year}')
+        message_parts.append(f'Ano {year}')
     elif year_estimated:
-        message_parts.append('confirme o ano abaixo')
-    if data.get('cor'):
-        message_parts.append(data['cor'])
-    if models:
-        message_parts.append(f'{len(models)} versão(ões) no catálogo')
-    else:
-        message_parts.append('buscando peças compatíveis por texto')
+        message_parts.append('Informe o ano do veículo abaixo')
 
     return {
         'valid': True,
@@ -345,7 +357,7 @@ def lookup_plate(plate: str, *, year_override=None) -> dict:
         'year_estimated': year_estimated and not year_override,
         'vehicle_models': models,
         'plate_data': data,
-        'message': ' · '.join(message_parts),
+        'message': ' · '.join(p for p in message_parts if p),
     }
 
 
@@ -385,9 +397,7 @@ def parse_vehicle_text_query(text: str, *, year_override=None) -> dict:
 
     message_parts = [tokens]
     if year:
-        message_parts.append(f'ano {year}')
-    if models:
-        message_parts.append(f'{len(models)} versão(ões) no catálogo')
+        message_parts.append(f'Ano {year}')
 
     return {
         'valid': True,

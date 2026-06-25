@@ -29,6 +29,7 @@ from .views.product_views import (
     ProductImageUploadView,
     ProductBrandsView,
 )
+from .views.catalog_views import CatalogFiltersView
 from .views.shop_views import (
     CheckoutView,
     ShopPaymentPreferenceView,
@@ -71,6 +72,7 @@ from .views.marketplace_views import (
     ProductReviewCreateView,
     VehicleBrandListView,
     VehicleModelListView,
+    VehicleSearchView,
     ReturnRequestListCreateView,
     ReturnRequestDetailView,
     SellerReturnListView,
@@ -124,6 +126,7 @@ urlpatterns = [
     path('auth/reset-password', ResetPasswordView.as_view(), name='reset-password'),
 
     # Catálogo (público)
+    path('catalog/filters/', CatalogFiltersView.as_view(), name='catalog-filters'),
     path('categories/', CategoryListView.as_view(), name='categories'),
     path('products/', ProductListView.as_view(), name='products'),
     path('products/brands/', ProductBrandsView.as_view(), name='product-brands'),
@@ -169,6 +172,7 @@ urlpatterns = [
     path('products/<int:product_id>/reviews/', ProductReviewListView.as_view(), name='product-reviews'),
     path('vehicles/brands/', VehicleBrandListView.as_view(), name='vehicle-brands'),
     path('vehicles/models/', VehicleModelListView.as_view(), name='vehicle-models'),
+    path('vehicles/search/', VehicleSearchView.as_view(), name='vehicle-search'),
     path('vehicles/lookup/', VehicleLookupView.as_view(), name='vehicle-lookup'),
 
     path('notifications/', NotificationListView.as_view(), name='notifications'),

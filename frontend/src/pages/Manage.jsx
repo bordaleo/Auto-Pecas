@@ -31,7 +31,7 @@ export default function Manage() {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [selectedVehicleModels, setSelectedVehicleModels] = useState([]);
+  const [selectedVehicleCompat, setSelectedVehicleCompat] = useState([]);
 
   const loadProducts = () => {
     api('/manage/products/').then(setProducts).catch(() => setProducts([]));
@@ -59,10 +59,15 @@ export default function Manage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (selectedVehicleModels.length === 0) {
+    if (selectedVehicleCompat.length === 0) {
       showToast('Selecione ao menos um veículo compatível.');
       return;
     }
+    const vehicle_compatibility = selectedVehicleCompat.map((e) => ({
+      model_id: e.model_id,
+      year_start: e.year_start,
+      year_end: e.year_end,
+    }));
     try {
       await api('/manage/products/', {
         method: 'POST',
@@ -73,12 +78,12 @@ export default function Manage() {
           stock: parseInt(form.stock, 10),
           category: form.category || null,
           warranty_days: parseInt(form.warranty_days, 10) || 0,
-          vehicle_model_ids: selectedVehicleModels,
+          vehicle_compatibility,
         }),
       });
       showToast('Peça cadastrada!');
       setForm(EMPTY_FORM);
-      setSelectedVehicleModels([]);
+      setSelectedVehicleCompat([]);
       loadProducts();
     } catch (error) {
       showToast(error.message);
@@ -128,8 +133,8 @@ export default function Manage() {
           <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </div>
         <VehicleCompatibilityPicker
-          selectedIds={selectedVehicleModels}
-          onChange={setSelectedVehicleModels}
+          selectedEntries={selectedVehicleCompat}
+          onChange={setSelectedVehicleCompat}
           required
         />
         <div className="form-group">

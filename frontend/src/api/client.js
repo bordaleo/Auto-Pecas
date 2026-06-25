@@ -103,6 +103,13 @@ export function buildWhatsAppProductUrl(baseUrl, product) {
   return `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}text=${text}`;
 }
 
+export function resolveMediaUrl(url) {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith('/')) return url;
+  return url;
+}
+
 export function productList(data) {
   if (Array.isArray(data)) return data;
   return data?.results || [];

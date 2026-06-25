@@ -12,12 +12,30 @@ class Command(BaseCommand):
         parser.add_argument(
             '--max-brands',
             type=int,
-            default=50,
-            help='Número máximo de marcas FIPE a importar (padrão: 50)',
+            default=0,
+            help='Número máximo de marcas FIPE (0 = todas, padrão: 0)',
+        )
+        parser.add_argument(
+            '--brand',
+            type=str,
+            default='',
+            help='Sincronizar apenas uma marca (slug ou nome, ex.: volkswagen)',
         )
 
     def handle(self, *args, **options):
         before = VehicleBrand.objects.filter(is_active=True).count()
+        brand = (options.get('brand') or '').strip()
+        if brand:
+            from api.services.fipe_sync_service import sync_fipe_brand
+            result = sync_fipe_brand(brand_slug=brand, brand_name=brand)
+            if result.get('error'):
+                self.stderr.write(self.style.ERROR(result['error']))
+                return
+            self.stdout.write(self.style.SUCCESS(
+                f'FIPE {result["brand"]}: {result["models_created"]} modelos novos, '
+                f'{result["models_updated"]} atualizados. Total na marca: {result["models_total"]}.'
+            ))
+            return
         result = sync_fipe_vehicles(max_brands=options['max_brands'])
         if result.get('error'):
             self.stderr.write(self.style.ERROR(result['error']))

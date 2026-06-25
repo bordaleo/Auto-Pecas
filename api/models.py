@@ -910,12 +910,22 @@ class ProductVehicleCompatibility(models.Model):
     vehicle_model = models.ForeignKey(
         VehicleModel, on_delete=models.CASCADE, related_name='product_links', verbose_name='Veículo',
     )
+    year_start = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        verbose_name='Ano início compat.',
+        help_text='Vazio = todos os anos do modelo FIPE.',
+    )
+    year_end = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        verbose_name='Ano fim compat.',
+        help_text='Vazio = todos os anos do modelo FIPE.',
+    )
 
     class Meta:
         verbose_name = 'Compatibilidade veicular'
         verbose_name_plural = 'Compatibilidades veiculares'
         db_table = 'product_vehicle_compatibilities'
-        unique_together = [['product', 'vehicle_model']]
+        unique_together = [['product', 'vehicle_model', 'year_start', 'year_end']]
 
     def __str__(self):
         return f'{self.product.name} → {self.vehicle_model}'

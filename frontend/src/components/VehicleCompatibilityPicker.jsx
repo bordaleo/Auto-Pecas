@@ -1,96 +1,115 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '../api/client';
-
-const CURRENT_YEAR = new Date().getFullYear();
-const YEAR_OPTIONS = ['', ...Array.from({ length: CURRENT_YEAR - 1979 }, (_, i) => String(CURRENT_YEAR - i))];
-
-function groupByBrand(models) {
-  const groups = new Map();
-  models.forEach((model) => {
-    const key = model.brand_slug || model.brand_name;
-    if (!groups.has(key)) {
-      groups.set(key, {
-        slug: model.brand_slug,
-        name: model.brand_name,
-        models: [],
-      });
-    }
-    groups.get(key).models.push(model);
-  });
-  return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-}
+import { Search } from 'lucide-react';
+import { api, productList } from '../api/client';
+import VehicleCompatAdder from './VehicleCompatAdder';
+import {
+  compatEntryKey,
+  formatCompatLabel,
+  normalizeCompatEntry,
+} from '../utils/vehicleCompat';
 
 export default function VehicleCompatibilityPicker({
-  selectedIds = [],
+  selectedEntries = [],
   onChange,
   required = false,
 }) {
-  const [allModels, setAllModels] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [yearFilter, setYearFilter] = useState('');
+  const [brands, setBrands] = useState([]);
+  const [brandsLoading, setBrandsLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [expandedBrands, setExpandedBrands] = useState({});
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [yearPickModel, setYearPickModel] = useState(null);
+  const [quickYears, setQuickYears] = useState(new Set());
 
   useEffect(() => {
-    setLoading(true);
-    api('/vehicles/models/')
-      .then((data) => {
-        setAllModels(data);
-        const initial = {};
-        groupByBrand(data).forEach((brand) => {
-          initial[brand.slug] = true;
-        });
-        setExpandedBrands(initial);
-      })
-      .catch(() => setAllModels([]))
-      .finally(() => setLoading(false));
+    setBrandsLoading(true);
+    api('/catalog/filters/')
+      .then((data) => setBrands(data.vehicle_brands || []))
+      .catch(() => api('/vehicles/brands/').then(setBrands))
+      .catch(() => setBrands([]))
+      .finally(() => setBrandsLoading(false));
   }, []);
 
-  const filteredGroups = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const year = yearFilter ? parseInt(yearFilter, 10) : null;
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      return undefined;
+    }
 
-    const filtered = allModels.filter((model) => {
-      if (year && (model.year_start > year || model.year_end < year)) return false;
-      if (!query) return true;
-      const label = `${model.brand_name} ${model.name}`.toLowerCase();
-      return label.includes(query);
-    });
+    let cancelled = false;
+    setSearchLoading(true);
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams({ q, limit: '40' });
+      api(`/vehicles/search/?${params}`)
+        .then((data) => {
+          if (!cancelled) setSearchResults(productList(data));
+        })
+        .catch(() => {
+          if (!cancelled) setSearchResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSearchLoading(false);
+        });
+    }, 250);
 
-    return groupByBrand(filtered);
-  }, [allModels, yearFilter, search]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [search]);
 
-  const selectedDetails = useMemo(
-    () => allModels.filter((model) => selectedIds.includes(model.id)),
-    [allModels, selectedIds],
+  const selectedKeys = useMemo(
+    () => new Set(selectedEntries.map(compatEntryKey)),
+    [selectedEntries],
   );
 
-  const toggleModel = (id) => {
-    onChange(
-      selectedIds.includes(id)
-        ? selectedIds.filter((item) => item !== id)
-        : [...selectedIds, id],
-    );
+  const addBatch = (entries) => {
+    const merged = [...selectedEntries];
+    const keys = new Set(merged.map(compatEntryKey));
+    entries.forEach((entry) => {
+      const key = compatEntryKey(entry);
+      if (!keys.has(key)) {
+        merged.push(entry);
+        keys.add(key);
+      }
+    });
+    onChange(merged);
   };
 
-  const removeSelected = (id) => {
-    onChange(selectedIds.filter((item) => item !== id));
+  const removeEntry = (entry) => {
+    const key = compatEntryKey(entry);
+    onChange(selectedEntries.filter((e) => compatEntryKey(e) !== key));
   };
 
-  const toggleBrand = (slug) => {
-    setExpandedBrands((prev) => ({ ...prev, [slug]: !prev[slug] }));
+  const openQuickYearPick = (model) => {
+    setYearPickModel(model);
+    setQuickYears(new Set());
   };
 
-  const selectAllInBrand = (brandModels) => {
-    const ids = brandModels.map((m) => m.id);
-    const merged = new Set([...selectedIds, ...ids]);
-    onChange(Array.from(merged));
+  const confirmQuickYears = () => {
+    if (!yearPickModel || quickYears.size === 0) return;
+    const entries = [...quickYears]
+      .sort((a, b) => a - b)
+      .map((y) => normalizeCompatEntry(yearPickModel, y, y));
+    addBatch(entries);
+    setYearPickModel(null);
+    setQuickYears(new Set());
   };
 
-  const clearBrand = (brandModels) => {
-    const ids = new Set(brandModels.map((m) => m.id));
-    onChange(selectedIds.filter((id) => !ids.has(id)));
+  const addQuickAllYears = (model) => {
+    addBatch([normalizeCompatEntry(model, null, null)]);
+    setYearPickModel(null);
   };
+
+  const quickYearsList = useMemo(() => {
+    if (!yearPickModel) return [];
+    const ys = Math.max(yearPickModel.year_start || 1990, 1990);
+    const ye = Math.min(yearPickModel.year_end || 2027, 2027);
+    const list = [];
+    for (let y = ye; y >= ys; y -= 1) list.push(y);
+    return list;
+  }, [yearPickModel]);
 
   return (
     <div className="vehicle-compat-picker">
@@ -100,106 +119,115 @@ export default function VehicleCompatibilityPicker({
           {required && ' *'}
         </label>
         <p className="field-hint">
-          Marque todos os modelos que servem nesta peça. Você pode escolher vários de marcas diferentes.
+          Escolha marca, modelo, versão e os anos em que a peça serve. Você pode adicionar vários de uma vez.
         </p>
       </div>
 
-      {selectedDetails.length > 0 && (
+      {selectedEntries.length > 0 && (
         <div className="vehicle-selected-chips">
-          {selectedDetails.map((m) => (
-            <span key={m.id} className="vehicle-chip">
-              {m.brand_name} {m.name} ({m.year_start}-{m.year_end})
-              <button type="button" aria-label="Remover" onClick={() => removeSelected(m.id)}>×</button>
+          <span className="vehicle-selected-count">
+            {selectedEntries.length} compatibilidade{selectedEntries.length > 1 ? 's' : ''}
+          </span>
+          {selectedEntries.map((entry) => (
+            <span key={compatEntryKey(entry)} className="vehicle-chip">
+              {formatCompatLabel(entry)}
+              <button type="button" aria-label="Remover" onClick={() => removeEntry(entry)}>×</button>
             </span>
           ))}
         </div>
       )}
 
-      <div className="vehicle-compat-toolbar">
-        <div className="form-group">
-          <label htmlFor="vehicle-search">Buscar modelo</label>
+      {!brandsLoading && (
+        <VehicleCompatAdder
+          brands={brands}
+          selectedEntries={selectedEntries}
+          onAddBatch={addBatch}
+        />
+      )}
+
+      <div className="vehicle-compat-search">
+        <label htmlFor="vehicle-compat-quick-search">Busca rápida</label>
+        <div className="vehicle-compat-search__input-wrap">
+          <Search size={16} aria-hidden="true" />
           <input
-            id="vehicle-search"
+            id="vehicle-compat-quick-search"
             type="search"
-            placeholder="Ex: Gol, Argo, Onix..."
+            placeholder="Ex: Gol, Argo, Seal Elétrico..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="form-group">
-          <label htmlFor="vehicle-year-filter">Filtrar por ano</label>
-          <select
-            id="vehicle-year-filter"
-            value={yearFilter}
-            onChange={(e) => setYearFilter(e.target.value)}
-          >
-            <option value="">Todos os anos</option>
-            {YEAR_OPTIONS.filter(Boolean).map((y) => (
-              <option key={y} value={y}>{y}</option>
+        {searchLoading && <p className="field-hint">Buscando...</p>}
+        {!searchLoading && search.trim().length >= 2 && searchResults.length === 0 && (
+          <p className="field-hint">Nenhum modelo encontrado.</p>
+        )}
+        {searchResults.length > 0 && !yearPickModel && (
+          <ul className="vehicle-selector__autolist vehicle-compat-search__results">
+            {searchResults.map((m) => (
+              <li key={m.id}>
+                <button
+                  type="button"
+                  className="vehicle-selector__autocomplete"
+                  onClick={() => openQuickYearPick(m)}
+                >
+                  <span className="vehicle-selector__autocomplete-main">
+                    {m.brand_name} {m.name}
+                  </span>
+                  <span className="vehicle-selector__autocomplete-meta">Escolher anos</span>
+                </button>
+              </li>
             ))}
-          </select>
-        </div>
-      </div>
-
-      {loading && <p className="field-hint">Carregando modelos...</p>}
-
-      {!loading && filteredGroups.length === 0 && (
-        <p className="field-hint">Nenhum modelo encontrado. Tente outro termo ou remova o filtro de ano.</p>
-      )}
-
-      <div className="vehicle-brand-list">
-        {filteredGroups.map((brand) => {
-          const brandSelected = brand.models.filter((m) => selectedIds.includes(m.id)).length;
-          const expanded = expandedBrands[brand.slug] !== false;
-
-          return (
-            <div key={brand.slug} className="vehicle-brand-section">
+          </ul>
+        )}
+        {yearPickModel && (
+          <div className="vehicle-compat-years vehicle-compat-years--inline">
+            <p className="vehicle-selector__panel-subtitle">
+              Anos — {yearPickModel.brand_name} {yearPickModel.name}
+            </p>
+            <div className="vehicle-compat-years__toolbar">
+              <button type="button" className="btn-link" onClick={() => setQuickYears(new Set(quickYearsList))}>
+                Marcar todos
+              </button>
+              <button type="button" className="btn-link" onClick={() => setQuickYears(new Set())}>Limpar</button>
+              <button type="button" className="btn-link" onClick={() => setYearPickModel(null)}>Cancelar</button>
+            </div>
+            <div className="vehicle-compat-years__grid">
+              {quickYearsList.map((y) => (
+                <label key={y} className="vehicle-compat-years__item">
+                  <input
+                    type="checkbox"
+                    checked={quickYears.has(y)}
+                    onChange={() => {
+                      setQuickYears((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(y)) next.delete(y);
+                        else next.add(y);
+                        return next;
+                      });
+                    }}
+                  />
+                  <span>{y}</span>
+                </label>
+              ))}
+            </div>
+            <div className="vehicle-compat-years__actions">
               <button
                 type="button"
-                className="vehicle-brand-header"
-                onClick={() => toggleBrand(brand.slug)}
+                className="btn btn-accent"
+                disabled={quickYears.size === 0}
+                onClick={confirmQuickYears}
               >
-                <span>
-                  {brand.name}
-                  {brandSelected > 0 && (
-                    <span className="vehicle-brand-count">{brandSelected} selecionado{brandSelected > 1 ? 's' : ''}</span>
-                  )}
-                </span>
-                <span className="vehicle-brand-toggle">{expanded ? '−' : '+'}</span>
+                Adicionar {quickYears.size || ''} ano(s)
               </button>
-
-              {expanded && (
-                <>
-                  <div className="vehicle-brand-actions">
-                    <button type="button" className="btn-link" onClick={() => selectAllInBrand(brand.models)}>
-                      Marcar todos
-                    </button>
-                    {brandSelected > 0 && (
-                      <button type="button" className="btn-link" onClick={() => clearBrand(brand.models)}>
-                        Limpar marca
-                      </button>
-                    )}
-                  </div>
-                  <div className="vehicle-model-checks vehicle-model-grid">
-                    {brand.models.map((m) => (
-                      <label key={m.id} className="vehicle-model-option">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(m.id)}
-                          onChange={() => toggleModel(m.id)}
-                        />
-                        <span>{m.name} <small>({m.year_start}-{m.year_end})</small></span>
-                      </label>
-                    ))}
-                  </div>
-                </>
-              )}
+              <button type="button" className="btn btn-secondary" onClick={() => addQuickAllYears(yearPickModel)}>
+                Todos os anos
+              </button>
             </div>
-          );
-        })}
+          </div>
+        )}
       </div>
 
-      {required && selectedIds.length === 0 && (
+      {required && selectedEntries.length === 0 && (
         <p className="field-hint field-hint-warn">Selecione ao menos um veículo compatível.</p>
       )}
     </div>

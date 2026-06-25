@@ -118,9 +118,11 @@ class VehicleBrandSerializer(serializers.ModelSerializer):
 
 
 class VehicleBrandListSerializer(serializers.ModelSerializer):
+    model_count = serializers.IntegerField(read_only=True, required=False)
+
     class Meta:
         model = VehicleBrand
-        fields = ['id', 'name', 'slug']
+        fields = ['id', 'name', 'slug', 'model_count']
 
 
 class ProductVehicleCompatWriteSerializer(serializers.Serializer):

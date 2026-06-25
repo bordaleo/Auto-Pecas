@@ -78,7 +78,7 @@ class ProductListView(ListAPIView):
         if vehicle_model:
             qs = apply_vehicle_model_filter(qs, vehicle_model)
         if vehicle_year:
-            qs = apply_vehicle_year_filter(qs, vehicle_year)
+            qs = apply_vehicle_year_filter(qs, vehicle_year, strict=bool(vehicle_model))
         if in_stock in ('1', 'true', 'yes'):
             qs = qs.filter(stock__gt=0)
         qs = qs.distinct()
@@ -89,7 +89,12 @@ class ProductDetailView(RetrieveAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = ProductDetailSerializer
     lookup_field = 'slug'
-    queryset = Product.objects.filter(is_active=True).select_related('category').prefetch_related('images')
+    queryset = Product.objects.filter(is_active=True).select_related(
+        'category', 'seller',
+    ).prefetch_related(
+        'images',
+        'vehicle_compatibilities__vehicle_model__brand',
+    )
 
     def retrieve(self, request, *args, **kwargs):
         response = super().retrieve(request, *args, **kwargs)

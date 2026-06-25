@@ -1,4 +1,5 @@
 """Notificações, NF-e, VIN/placa, CSV import, analytics."""
+import logging
 from decimal import Decimal
 
 from django.db.models import F
@@ -33,6 +34,8 @@ from api.services.vin_lookup_service import (
     decode_vin, lookup_plate, find_products_for_vehicle, parse_vehicle_text_query,
 )
 from api.views.admin_views import painel_api_authorized
+
+logger = logging.getLogger(__name__)
 
 
 class NotificationListView(APIView):
@@ -84,29 +87,36 @@ class VehicleLookupView(APIView):
         query = (request.data.get('query') or '').strip()
         year_override = request.data.get('year')
 
-        if vin:
-            result = decode_vin(vin, year_override=year_override)
-        elif plate:
-            result = lookup_plate(plate, year_override=year_override)
-        elif query:
-            result = parse_vehicle_text_query(query, year_override=year_override)
-        else:
-            return Response({'detail': 'Informe VIN, placa ou modelo/ano.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            if vin:
+                result = decode_vin(vin, year_override=year_override)
+            elif plate:
+                result = lookup_plate(plate, year_override=year_override)
+            elif query:
+                result = parse_vehicle_text_query(query, year_override=year_override)
+            else:
+                return Response({'detail': 'Informe VIN, placa ou modelo/ano.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not result.get('valid', True):
-            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+            if not result.get('valid', True):
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
-        model_ids = [m['id'] for m in result.get('vehicle_models', [])]
-        products = find_products_for_vehicle(
-            model_ids,
-            brand_hint=result.get('brand_hint') or '',
-            model_hint=result.get('model_hint') or '',
-        ) if model_ids or result.get('model_hint') or result.get('brand_hint') else []
+            model_ids = [m['id'] for m in result.get('vehicle_models', [])]
+            products = find_products_for_vehicle(
+                model_ids,
+                brand_hint=result.get('brand_hint') or '',
+                model_hint=result.get('model_hint') or '',
+            ) if model_ids or result.get('model_hint') or result.get('brand_hint') else []
 
-        return Response({
-            **result,
-            'products': ProductListSerializer(products, many=True).data,
-        })
+            return Response({
+                **result,
+                'products': ProductListSerializer(products, many=True).data,
+            })
+        except Exception as exc:
+            logger.exception('vehicle lookup failed: %s', exc)
+            return Response(
+                {'valid': False, 'detail': 'Não foi possível consultar o veículo agora. Tente novamente ou use os filtros manuais.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
 
 class InvoiceRequestListCreateView(APIView):

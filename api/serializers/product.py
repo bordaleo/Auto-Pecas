@@ -183,15 +183,17 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         return ProductReview.objects.filter(product=obj, is_visible=True).count()
 
     def get_vehicle_models(self, obj):
-        links = obj.vehicle_compatibilities.select_related('vehicle_model__brand').all()[:20]
+        links = obj.vehicle_compatibilities.select_related('vehicle_model__brand').all()
         return [
             {
                 'id': l.vehicle_model_id,
                 'name': l.vehicle_model.name,
                 'brand': l.vehicle_model.brand.name,
                 'brand_slug': l.vehicle_model.brand.slug,
-                'year_start': l.vehicle_model.year_start,
-                'year_end': l.vehicle_model.year_end,
+                'year_start': l.year_start if l.year_start is not None else l.vehicle_model.year_start,
+                'year_end': l.year_end if l.year_end is not None else l.vehicle_model.year_end,
+                'compat_year_start': l.year_start,
+                'compat_year_end': l.year_end,
             }
             for l in links
         ]
@@ -226,6 +228,12 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         return '0.00'
 
 
+class VehicleCompatEntrySerializer(serializers.Serializer):
+    model_id = serializers.IntegerField()
+    year_start = serializers.IntegerField(required=False, allow_null=True)
+    year_end = serializers.IntegerField(required=False, allow_null=True)
+
+
 class ProductWriteSerializer(serializers.ModelSerializer):
     extra_images = serializers.ListField(
         child=serializers.URLField(),
@@ -240,7 +248,8 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             'name', 'slug', 'description', 'sku', 'oem_code', 'brand', 'price', 'cost_price',
             'compare_at_price', 'stock', 'image_url', 'is_active', 'is_featured',
             'compatible_vehicles', 'category', 'extra_images',
-            'weight_kg', 'width_cm', 'height_cm', 'length_cm', 'vehicle_model_ids',
+            'weight_kg', 'width_cm', 'height_cm', 'length_cm',
+            'vehicle_model_ids', 'vehicle_compatibility',
             'part_condition', 'part_origin', 'warranty_days',
         ]
         extra_kwargs = {
@@ -254,6 +263,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
     vehicle_model_ids = serializers.ListField(
         child=serializers.IntegerField(), required=False, write_only=True,
     )
+    vehicle_compatibility = VehicleCompatEntrySerializer(many=True, required=False, write_only=True)
 
     def validate_slug(self, value):
         slug = slugify(value) if value else ''
@@ -266,28 +276,75 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Envie uma foto real da peça antes de publicar.')
         return value
 
-    def _sync_vehicle_models(self, product, model_ids):
-        if model_ids is None:
-            return
+    def _format_compat_label(self, model, year_start, year_end):
+        if year_start is not None and year_end is not None:
+            if year_start == year_end:
+                years = str(year_start)
+            else:
+                years = f'{year_start}-{year_end}'
+        else:
+            years = f'{model.year_start}-{model.year_end}'
+        return f'{model.brand.name} {model.name} ({years})'
+
+    def _sync_vehicle_compat(self, product, compat_entries, model_ids):
         from api.models import VehicleModel
+
+        if compat_entries is None and model_ids is None:
+            return
+
         ProductVehicleCompatibility.objects.filter(product=product).delete()
         labels = []
-        for mid in model_ids:
-            ProductVehicleCompatibility.objects.get_or_create(product=product, vehicle_model_id=mid)
-            try:
-                model = VehicleModel.objects.select_related('brand').get(pk=mid)
-                labels.append(
-                    f"{model.brand.name} {model.name} ({model.year_start}-{model.year_end})"
+        seen = set()
+
+        if compat_entries is not None:
+            for entry in compat_entries:
+                mid = entry['model_id']
+                ys = entry.get('year_start')
+                ye = entry.get('year_end')
+                if ys is not None and ye is None:
+                    ye = ys
+                if ye is not None and ys is None:
+                    ys = ye
+                key = (mid, ys, ye)
+                if key in seen:
+                    continue
+                seen.add(key)
+                ProductVehicleCompatibility.objects.create(
+                    product=product,
+                    vehicle_model_id=mid,
+                    year_start=ys,
+                    year_end=ye,
                 )
-            except VehicleModel.DoesNotExist:
-                continue
-        if labels:
-            product.compatible_vehicles = ', '.join(labels)
-            product.save(update_fields=['compatible_vehicles', 'updated_at'])
+                try:
+                    model = VehicleModel.objects.select_related('brand').get(pk=mid)
+                    labels.append(self._format_compat_label(model, ys, ye))
+                except VehicleModel.DoesNotExist:
+                    continue
+        elif model_ids is not None:
+            for mid in model_ids:
+                key = (mid, None, None)
+                if key in seen:
+                    continue
+                seen.add(key)
+                ProductVehicleCompatibility.objects.create(
+                    product=product,
+                    vehicle_model_id=mid,
+                    year_start=None,
+                    year_end=None,
+                )
+                try:
+                    model = VehicleModel.objects.select_related('brand').get(pk=mid)
+                    labels.append(self._format_compat_label(model, None, None))
+                except VehicleModel.DoesNotExist:
+                    continue
+
+        product.compatible_vehicles = ', '.join(labels)
+        product.save(update_fields=['compatible_vehicles', 'updated_at'])
 
     def create(self, validated_data):
         extra_images = validated_data.pop('extra_images', [])
         model_ids = validated_data.pop('vehicle_model_ids', None)
+        compat_entries = validated_data.pop('vehicle_compatibility', None)
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             validated_data['created_by'] = request.user
@@ -296,12 +353,13 @@ class ProductWriteSerializer(serializers.ModelSerializer):
         product = Product.objects.create(**validated_data)
         for i, url in enumerate(extra_images):
             ProductImage.objects.create(product=product, url=url, sort_order=i)
-        self._sync_vehicle_models(product, model_ids)
+        self._sync_vehicle_compat(product, compat_entries, model_ids)
         return product
 
     def update(self, instance, validated_data):
         extra_images = validated_data.pop('extra_images', None)
         model_ids = validated_data.pop('vehicle_model_ids', None)
+        compat_entries = validated_data.pop('vehicle_compatibility', None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
@@ -309,7 +367,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             instance.images.all().delete()
             for i, url in enumerate(extra_images):
                 ProductImage.objects.create(product=instance, url=url, sort_order=i)
-        self._sync_vehicle_models(instance, model_ids)
+        self._sync_vehicle_compat(instance, compat_entries, model_ids)
         return instance
 
 

@@ -193,28 +193,100 @@ class VehicleBrandListView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        from django.core.cache import cache
-        from api.services.fipe_sync_service import sync_fipe_vehicles
+        from api.services.fipe_sync_service import schedule_full_fipe_sync
 
-        if VehicleBrand.objects.filter(is_active=True).count() < 12:
-            if cache.add('galelugi_fipe_sync', 1, 3600):
-                try:
-                    sync_fipe_vehicles(max_brands=40)
-                except Exception:
-                    pass
+        from django.db.models import Count, Q
 
-        brands = VehicleBrand.objects.filter(is_active=True).order_by('name')
+        active_count = VehicleBrand.objects.filter(is_active=True).count()
+        if active_count < 20:
+            schedule_full_fipe_sync()
+
+        brands = (
+            VehicleBrand.objects.filter(is_active=True)
+            .annotate(model_count=Count('models', filter=Q(models__is_active=True)))
+            .order_by('name')
+        )
         return Response(VehicleBrandListSerializer(brands, many=True).data)
+
+
+def _vehicle_model_queryset(request):
+    from django.utils.text import slugify
+    from api.services.fipe_sync_service import ensure_brand_models_synced
+
+    brand = request.query_params.get('brand', '').strip()
+    year = request.query_params.get('year', '').strip()
+    q = request.query_params.get('q', '').strip()
+
+    if brand:
+        ensure_brand_models_synced(brand, min_models=12)
+
+    qs = VehicleModel.objects.filter(is_active=True).select_related('brand')
+    if brand:
+        qs = qs.filter(Q(brand__slug=brand) | Q(brand__name__iexact=brand))
+    if year:
+        try:
+            y = int(year)
+            qs = qs.filter(year_start__lte=y, year_end__gte=y)
+        except ValueError:
+            pass
+    if q:
+        q_slug = slugify(q)
+        qs = qs.filter(
+            Q(name__icontains=q)
+            | Q(slug__icontains=q_slug)
+            | Q(brand__name__icontains=q)
+        )
+    return qs.order_by('brand__name', 'name')
 
 
 class VehicleModelListView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        qs = VehicleModel.objects.filter(is_active=True).select_related('brand')
-        brand = request.query_params.get('brand', '').strip()
-        year = request.query_params.get('year', '').strip()
+        qs = _vehicle_model_queryset(request)
+        try:
+            limit = min(int(request.query_params.get('limit', '1000')), 5000)
+        except ValueError:
+            limit = 1000
+        try:
+            offset = max(int(request.query_params.get('offset', '0')), 0)
+        except ValueError:
+            offset = 0
+
+        total = qs.count()
+        page = qs[offset:offset + limit]
+        return Response({
+            'count': total,
+            'results': VehicleModelSerializer(page, many=True).data,
+        })
+
+
+class VehicleSearchView(APIView):
+    """Busca textual de modelos em todas as marcas (autocomplete)."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from django.utils.text import slugify
+        from api.services.fipe_sync_service import ensure_brand_models_synced
+
         q = request.query_params.get('q', '').strip()
+        year = request.query_params.get('year', '').strip()
+        brand = request.query_params.get('brand', '').strip()
+
+        if len(q) < 2:
+            return Response({'count': 0, 'results': []})
+
+        if brand:
+            ensure_brand_models_synced(brand, min_models=12)
+
+        qs = VehicleModel.objects.filter(is_active=True).select_related('brand')
+        q_slug = slugify(q)
+        qs = qs.filter(
+            Q(name__icontains=q)
+            | Q(slug__icontains=q_slug)
+            | Q(brand__name__icontains=q)
+        )
         if brand:
             qs = qs.filter(Q(brand__slug=brand) | Q(brand__name__iexact=brand))
         if year:
@@ -223,9 +295,35 @@ class VehicleModelListView(APIView):
                 qs = qs.filter(year_start__lte=y, year_end__gte=y)
             except ValueError:
                 pass
-        if q:
-            qs = qs.filter(name__icontains=q)
-        return Response(VehicleModelSerializer(qs.order_by('brand__name', 'name')[:800], many=True).data)
+
+        try:
+            limit = min(int(request.query_params.get('limit', '30')), 50)
+        except ValueError:
+            limit = 30
+
+        results = []
+        for vm in qs[: limit * 3]:
+            score = 0
+            name_l = vm.name.lower()
+            q_l = q.lower()
+            if name_l == q_l:
+                score = 100
+            elif name_l.startswith(q_l):
+                score = 90
+            elif q_l in name_l:
+                score = 75
+            elif vm.slug == q_slug:
+                score = 85
+            else:
+                score = 60
+            results.append((score, vm))
+
+        results.sort(key=lambda x: (-x[0], x[1].brand.name, x[1].name))
+        models = [vm for _, vm in results[:limit]]
+        return Response({
+            'count': len(models),
+            'results': VehicleModelSerializer(models, many=True).data,
+        })
 
 
 class ReturnRequestListCreateView(APIView):

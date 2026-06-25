@@ -66,19 +66,29 @@ def apply_vehicle_model_filter(qs: QuerySet, vehicle_model: str) -> QuerySet:
     )
 
 
-def apply_vehicle_year_filter(qs: QuerySet, vehicle_year: str) -> QuerySet:
+def apply_vehicle_year_filter(qs: QuerySet, vehicle_year: str, *, strict: bool = False) -> QuerySet:
     if not vehicle_year:
         return qs
     try:
         y = int(vehicle_year)
     except ValueError:
         return qs
-    year_q = (
-        Q(vehicle_compatibilities__vehicle_model__year_start__lte=y)
+    specific_year = (
+        Q(vehicle_compatibilities__year_start__isnull=False)
+        & Q(vehicle_compatibilities__year_start__lte=y)
+        & Q(vehicle_compatibilities__year_end__gte=y)
+    )
+    all_years = (
+        Q(vehicle_compatibilities__year_start__isnull=True)
+        & Q(vehicle_compatibilities__year_end__isnull=True)
+        & Q(vehicle_compatibilities__vehicle_model__year_start__lte=y)
         & Q(vehicle_compatibilities__vehicle_model__year_end__gte=y)
     )
+    year_q = specific_year | all_years
+    if strict:
+        return qs.filter(year_q).distinct()
     year_text = Q(compatible_vehicles__icontains=str(y)) | Q(name__icontains=str(y))
-    return qs.filter(year_q | year_text)
+    return qs.filter(year_q | year_text).distinct()
 
 
 def order_products(qs: QuerySet, ordering: str = '') -> QuerySet:
