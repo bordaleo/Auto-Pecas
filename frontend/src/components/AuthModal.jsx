@@ -236,8 +236,15 @@ export default function AuthModal({ open, tab: initialTab, onClose, onTabChange 
           {tab === 'login' && (
             <form onSubmit={handleLogin}>
               <div className="form-group">
-                <label htmlFor="login-email">Email</label>
-                <input id="login-email" name="email" type="email" required />
+                <label htmlFor="login-email">Email ou usuário</label>
+                <input
+                  id="login-email"
+                  name="email"
+                  type="text"
+                  required
+                  autoComplete="username"
+                  placeholder="sandroni, sandroni@sandroni ou sandroni@sandroni.com"
+                />
               </div>
               <div className="form-group">
                 <label htmlFor="login-password">Senha</label>

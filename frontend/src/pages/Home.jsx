@@ -1,23 +1,27 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, productCount, productList } from '../api/client';
 import { useStore } from '../context/StoreContext';
-import CouponBanner from '../components/CouponBanner';
+import HomeHeroZone from '../components/HomeHeroZone';
 import BrandMarquee from '../components/BrandMarquee';
-import HeroBanner from '../components/HeroBanner';
 import ProductCard from '../components/ProductCard';
 import SectionHeader from '../components/SectionHeader';
-import ValuePillars from '../components/ValuePillars';
-
-const CAT_COLORS = ['#D4622A', '#3D8B7A', '#5B7DB1', '#8B5E3C', '#6B4C9A', '#C45B28'];
+import HeroSection from '../components/landing/HeroSection';
+import CategoriesSection from '../components/landing/CategoriesSection';
+import WhyUsSection from '../components/landing/WhyUsSection';
+import TrustSection from '../components/landing/TrustSection';
+import CtaSection from '../components/landing/CtaSection';
 
 export default function Home() {
-  const { categories, config } = useStore();
+  const navigate = useNavigate();
+  const { config } = useStore();
   const [featured, setFeatured] = useState([]);
   const [popular, setPopular] = useState([]);
   const [totalProducts, setTotalProducts] = useState(0);
+  const [catalogError, setCatalogError] = useState(false);
 
   useEffect(() => {
+    setCatalogError(false);
     Promise.all([
       api('/products/?featured=1'),
       api('/products/'),
@@ -26,38 +30,30 @@ export default function Home() {
       setFeatured(productList(featuredData).slice(0, 8));
       setPopular(all.slice(0, 8));
       setTotalProducts(productCount(allData, all));
-    }).catch(() => {});
+    }).catch(() => {
+      setCatalogError(true);
+    });
   }, []);
 
-  return (
-    <div className="home">
-      <CouponBanner />
-      <HeroBanner />
-      <ValuePillars />
+  const handleSearch = (query) => {
+    navigate(`/pecas/?q=${encodeURIComponent(query)}`);
+  };
 
-      <section className="home-section wrap">
-        <SectionHeader
-          title="Departamentos"
-          subtitle="Navegue por tipo de componente"
-          href="/pecas/"
-        />
-        <div className="dept-grid">
-          {categories.map((cat, i) => (
-            <Link
-              key={cat.slug}
-              to={`/pecas/?category=${cat.slug}`}
-              className="dept-card"
-              style={{ '--dept-color': CAT_COLORS[i % CAT_COLORS.length] }}
-            >
-              <span className="dept-icon">{cat.icon || '⚙'}</span>
-              <span className="dept-name">{cat.name}</span>
-              <span className="dept-arrow">→</span>
-            </Link>
-          ))}
-        </div>
-      </section>
+  return (
+    <div className="home home--enhanced">
+      <HomeHeroZone onSearch={handleSearch} />
+      <HeroSection />
+      <CategoriesSection />
+      <WhyUsSection />
 
       <BrandMarquee />
+
+      {catalogError && (
+        <p className="state-empty wrap" style={{ marginTop: '1rem' }}>
+          Não foi possível carregar o catálogo. Verifique se o backend está rodando
+          {' '}(<code>python manage.py runserver</code> ou <code>npm run dev:backend</code>).
+        </p>
+      )}
 
       <section className="home-section wrap">
         <SectionHeader
@@ -75,34 +71,26 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="trust-banner wrap">
-        <div className="trust-banner-inner">
-          <div>
-            <span className="eyebrow eyebrow--light">Galelugi Garante</span>
-            <h3>Estoque real. Peça certa. Entrega que funciona.</h3>
-            <p>
-              Frete grátis em pedidos acima de R$ {config.free_shipping_min || 299}.
-              Retirada na loja disponível. Pagamento seguro via Mercado Pago.
-            </p>
-          </div>
-          <Link to="/pecas/" className="btn btn-light">Comprar agora</Link>
-        </div>
-      </section>
+      <TrustSection />
 
-      <section className="trust-banner wrap">
-        <div className="trust-banner-inner">
-          <div>
-            <span className="eyebrow eyebrow--light">Para vendedores</span>
+      <section className="promo-band wrap">
+        <div className="promo-band__card">
+          <div className="promo-band__content">
+            <span className="promo-band__eyebrow">Para vendedores</span>
             <h3>Tem peças para vender? Abra sua loja na Galelugi</h3>
             <p>
               Publique anúncios, alcance compradores em todo o Brasil e receba o repasse após cada venda.
               Comissão de {config.marketplace_commission_percent || 8}% por transação.
             </p>
           </div>
-            <Link to="/como-funciona/" className="btn btn-secondary" style={{ marginRight: '0.5rem' }}>Como funciona</Link>
-          <Link to="/vender/" className="btn btn-light">Começar a vender</Link>
+          <div className="promo-band__actions">
+            <Link to="/como-funciona/" className="gl-btn gl-btn--ghost">Como funciona</Link>
+            <Link to="/vender/" className="gl-btn gl-btn--primary">Começar a vender</Link>
+          </div>
         </div>
       </section>
+
+      <CtaSection />
 
       <section className="home-section wrap">
         <SectionHeader

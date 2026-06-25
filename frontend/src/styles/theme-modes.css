@@ -113,6 +113,24 @@ html[data-theme="light"] .header-action-label {
   color: var(--header-muted);
 }
 
+html[data-theme="light"] .header-action--login {
+  border-color: rgba(15, 28, 46, 0.14);
+  background: rgba(255, 255, 255, 0.75);
+}
+
+html[data-theme="light"] .header-action--login .header-action-title {
+  color: #0f1c2e;
+}
+
+html[data-theme="light"] .header-action--login:hover {
+  background: rgba(232, 98, 26, 0.1);
+  border-color: rgba(232, 98, 26, 0.45);
+}
+
+html[data-theme="light"] .header-action--login:hover .header-action-title {
+  color: #b84e1f;
+}
+
 html[data-theme="light"] .header-search {
   background: var(--header-input-bg);
   border-color: var(--header-input-border);
@@ -161,21 +179,77 @@ html[data-theme="light"] .footer-btn:hover {
   color: var(--gl-copper);
 }
 
-html[data-theme="light"] .footer-col h4,
-html[data-theme="light"] .footer-cta h3 {
+html[data-theme="light"] .promo-band__card .gl-btn--ghost {
+  border-color: rgba(15, 28, 46, 0.2);
   color: #0f1c2e;
 }
 
-html[data-theme="light"] .footer-cta {
-  background: rgba(255, 255, 255, 0.55);
-  border-color: rgba(15, 28, 46, 0.08);
+html[data-theme="light"] .promo-band__card {
+  --promo-surface: rgba(255, 255, 255, 0.97);
+  --promo-border: rgba(15, 28, 46, 0.11);
+  --promo-fg: #0f1c2e;
+  --promo-fg-secondary: #475569;
+  box-shadow: var(--gl-glass-shadow);
 }
 
-html[data-theme="light"] .gl-logo--light .gl-logo-word,
-html[data-theme="light"] .gl-logo--light .gl-logo-sub {
-  color: inherit;
+html[data-theme="light"] .site-sidebar .gl-logo--light .gl-logo-word,
+html[data-theme="light"] .site-sidebar .sidebar-brand .gl-logo-word {
+  color: #fff;
 }
 
+html[data-theme="light"] .site-sidebar .gl-logo--light .gl-logo-sub,
+html[data-theme="light"] .site-sidebar .sidebar-brand .gl-logo-sub {
+  color: rgba(168, 212, 200, 0.92);
+}
+
+html[data-theme="light"] .footer-brand .gl-logo--light .gl-logo-word {
+  color: #0f1c2e;
+}
+
+html[data-theme="light"] .footer-brand .gl-logo--light .gl-logo-sub {
+  color: var(--gl-sage);
+}
+
+html[data-theme="light"] .footer-col h4 {
+  color: #0f1c2e;
+}
+
+/* ── Home landing sections: modo claro ── */
+html[data-theme="light"] .home--enhanced {
+  --lp-surface: rgba(255, 255, 255, 0.97);
+  --lp-surface-hover: #ffffff;
+  --lp-elevated: rgba(255, 255, 255, 0.55);
+  --lp-border: rgba(15, 28, 46, 0.11);
+  --lp-border-hover: rgba(232, 98, 26, 0.45);
+  --lp-fg: #0f1c2e;
+  --lp-fg-secondary: #475569;
+  --lp-fg-muted: #64748b;
+  --lp-surface-fg: #0f1c2e;
+  --lp-surface-fg-secondary: #475569;
+  --lp-surface-fg-muted: #64748b;
+  --lp-input-bg: #ffffff;
+  --lp-input-border: rgba(15, 28, 46, 0.14);
+  --lp-input-fg: #0f1c2e;
+  --lp-input-placeholder: #94a3b8;
+  --lp-tag-bg: rgba(15, 28, 46, 0.05);
+  --lp-tag-border: rgba(15, 28, 46, 0.1);
+  --lp-tag-fg: #475569;
+  --lp-ghost-border: rgba(15, 28, 46, 0.2);
+  --lp-ghost-fg: #0f1c2e;
+  --lp-grid-gap: rgba(15, 28, 46, 0.08);
+  --lp-stat-prefix: #0f1c2e;
+}
+
+html[data-theme="light"] .home--enhanced .home-hero-zone__card,
+html[data-theme="light"] .home--enhanced .gl-stat-card,
+html[data-theme="light"] .home--enhanced .gl-category-card,
+html[data-theme="light"] .home--enhanced .gl-feature-card,
+html[data-theme="light"] .home--enhanced .gl-review-card,
+html[data-theme="light"] .home--enhanced .gl-cta-box {
+  box-shadow: var(--gl-glass-shadow);
+}
+
+/* ── Light mode: cards & marketing ── */
 html[data-theme="light"] .header-brand .gl-logo-word {
   color: #0f1c2e;
 }

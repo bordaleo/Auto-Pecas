@@ -7,19 +7,29 @@ export default function Footer({ onOpenAuth }) {
 
   return (
     <footer className="site-footer">
-      <div className="footer-cta wrap">
-        <div>
-          <h3>Precisa de ajuda para encontrar a peça?</h3>
-          <p>Fale com nosso time pelo WhatsApp — especialistas em autopeças.</p>
+      <div className="wrap promo-band site-footer__promo">
+        <div className="promo-band__card">
+          <div className="promo-band__content">
+            <span className="promo-band__eyebrow">Ajuda</span>
+            <h3>Precisa de ajuda para encontrar a peça?</h3>
+            <p>Fale com nosso time pelo WhatsApp — especialistas em autopeças.</p>
+          </div>
+          <div className="promo-band__actions">
+            <a
+              href={whatsappUrl}
+              className="gl-btn gl-btn--primary"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Chamar no WhatsApp
+            </a>
+          </div>
         </div>
-        <a href={whatsappUrl} className="btn btn-accent" target="_blank" rel="noreferrer">
-          Chamar no WhatsApp
-        </a>
       </div>
 
       <div className="wrap footer-grid">
         <div className="footer-brand">
-          <Logo />
+          <Logo light />
           <p>
             Galelugi é o marketplace de autopeças feito para mecânicos, revendedores
             e motoristas que não podem errar na hora de comprar.

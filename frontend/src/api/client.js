@@ -47,16 +47,25 @@ export async function api(path, options = {}) {
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const response = await fetch(`${API}${path}`, {
-    credentials: options.credentials || 'same-origin',
-    ...options,
-    headers,
-  });
-  let data = null;
+  let response;
   try {
-    data = await response.json();
+    response = await fetch(`${API}${path}`, {
+      credentials: options.credentials || 'same-origin',
+      ...options,
+      headers,
+    });
   } catch {
-    data = null;
+    throw new Error('Não foi possível conectar ao servidor. Verifique se o backend está rodando.');
+  }
+
+  let data = null;
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
   }
 
   if (!response.ok) {
@@ -65,6 +74,13 @@ export async function api(path, options = {}) {
         typeof data?.detail === 'string'
           ? data.detail
           : 'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
+      );
+    }
+    if (!data) {
+      throw new Error(
+        response.status >= 500
+          ? 'Erro no servidor. Tente novamente em instantes.'
+          : `Erro na requisição (${response.status}). Verifique se a API está online.`,
       );
     }
     throw new Error(parseError(data));

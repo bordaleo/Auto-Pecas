@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import './styles/global.css';
 import './styles/theme.css';
 import './styles/theme-modes.css';
+import './styles/landing.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

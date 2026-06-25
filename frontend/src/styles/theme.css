@@ -874,12 +874,8 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.footer-cta {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: var(--gl-radius-lg);
-  margin: 0 0 0.5rem;
-  padding: 2rem 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+.site-footer > .site-footer__promo.wrap {
+  margin-bottom: 0.5rem;
 }
 
 /* ── Hero premium ── */
