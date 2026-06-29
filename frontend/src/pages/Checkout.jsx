@@ -43,7 +43,7 @@ export default function Checkout() {
   const [paymentUrl, setPaymentUrl] = useState('');
   const [preferenceId, setPreferenceId] = useState('');
   const [orderAmount, setOrderAmount] = useState(total);
-  const [couponCode, setCouponCode] = useState('BEMVINDO10');
+  const [couponCode, setCouponCode] = useState('');
   const [discount, setDiscount] = useState(0);
   const [couponLabel, setCouponLabel] = useState('');
   const [brickError, setBrickError] = useState('');
