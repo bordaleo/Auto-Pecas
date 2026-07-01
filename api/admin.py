@@ -7,7 +7,7 @@ from .models import (
     PasswordResetToken, SystemConfig, OpsAlertEvent, SiteEngagementTotals,
     Coupon, AbandonedCart, ProductReview, ReturnRequest, VehicleBrand, VehicleModel,
     ProductConversation, ProductMessage, StockReservation,
-    UserNotification, InvoiceRequest, ProductViewEvent,
+    UserNotification, InvoiceRequest, ProductViewEvent, CatalogSearchEvent,
 )
 
 
@@ -226,6 +226,13 @@ class InvoiceRequestAdmin(admin.ModelAdmin):
 class ProductViewEventAdmin(admin.ModelAdmin):
     list_display = ['product', 'user', 'session_key', 'created_at']
     list_filter = ['created_at']
+
+
+@admin.register(CatalogSearchEvent)
+class CatalogSearchEventAdmin(admin.ModelAdmin):
+    list_display = ['event_type', 'term', 'source', 'result_count', 'product', 'user', 'created_at']
+    list_filter = ['event_type', 'source', 'created_at']
+    search_fields = ['term', 'session_key']
 
 
 admin.site.site_header = "Galelugi Peças — Administração"

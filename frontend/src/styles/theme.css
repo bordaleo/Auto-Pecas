@@ -1131,6 +1131,12 @@ body {
   padding: 1.25rem;
   box-shadow: var(--gl-glass-shadow);
   color: var(--gl-text);
+  overflow: visible;
+}
+
+.catalog-filters-box:has(.vf-select.is-open) {
+  position: relative;
+  z-index: 50;
 }
 
 .vin-lookup-box h3,
@@ -1141,6 +1147,13 @@ body {
   color: var(--gl-midnight);
   margin: 0 0 1rem;
   letter-spacing: -0.02em;
+}
+
+.catalog-filters-box__lead {
+  margin: -0.5rem 0 1rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--gl-muted);
 }
 
 .vin-lookup-tabs {
@@ -1204,17 +1217,53 @@ body {
   margin-bottom: 0.45rem;
 }
 
-.filters-panel .filter-row label:has(input[type='checkbox']) {
+.filters-panel .filter-row label:has(input[type='checkbox']),
+.filters-panel .filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  margin-bottom: 0;
   text-transform: none;
   letter-spacing: 0;
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--gl-text);
-  padding: 0.75rem 0.85rem;
+  padding: 0.82rem 1rem;
   border: 1.5px solid var(--gl-input-border);
   border-radius: 12px;
   background: var(--gl-input-bg);
   cursor: pointer;
+  transition: border-color var(--gl-transition), background var(--gl-transition), box-shadow var(--gl-transition);
+}
+
+.filters-panel .filter-checkbox:hover {
+  border-color: #cbd5e1;
+  background: #fff;
+}
+
+.filters-panel .filter-checkbox:has(input:checked) {
+  border-color: var(--gl-copper);
+  background: rgba(232, 98, 26, 0.08);
+}
+
+.filters-panel .filter-checkbox:has(input:focus-visible) {
+  outline: none;
+  border-color: var(--gl-copper);
+  box-shadow: 0 0 0 4px var(--gl-input-ring);
+}
+
+.filters-panel .filter-checkbox input[type='checkbox'] {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--gl-copper);
+  cursor: pointer;
+}
+
+.filters-panel .filter-checkbox span {
+  line-height: 1.35;
 }
 
 .faq-item,

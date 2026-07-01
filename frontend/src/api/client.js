@@ -119,6 +119,46 @@ export function productCount(data, list) {
   return data?.count ?? list.length;
 }
 
+const CATALOG_FILTERS_CACHE_KEY = 'catalog_filters_cache';
+const CATALOG_FILTERS_TTL_MS = 5 * 60 * 1000;
+
+let catalogFiltersMemory = null;
+let catalogFiltersFetchedAt = 0;
+
+/** Metadados do catálogo com cache em memória e localStorage (5 min). */
+export async function fetchCatalogFilters({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && catalogFiltersMemory && now - catalogFiltersFetchedAt < CATALOG_FILTERS_TTL_MS) {
+    return catalogFiltersMemory;
+  }
+
+  if (!force) {
+    try {
+      const stored = localStorage.getItem(CATALOG_FILTERS_CACHE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.data && now - parsed.at < CATALOG_FILTERS_TTL_MS) {
+          catalogFiltersMemory = parsed.data;
+          catalogFiltersFetchedAt = parsed.at;
+          return parsed.data;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const data = await api('/catalog/filters/');
+  catalogFiltersMemory = data;
+  catalogFiltersFetchedAt = now;
+  try {
+    localStorage.setItem(CATALOG_FILTERS_CACHE_KEY, JSON.stringify({ at: now, data }));
+  } catch {
+    /* ignore */
+  }
+  return data;
+}
+
 /** Busca todas as páginas de produtos (até maxPages). */
 export async function fetchProductPages(basePath, { maxPages = 4, pageSize = 60 } = {}) {
   const buildUrl = (page) => {

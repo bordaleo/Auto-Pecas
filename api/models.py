@@ -1270,3 +1270,40 @@ class ProductViewEvent(models.Model):
         db_table = 'product_view_events'
         indexes = [models.Index(fields=['product', '-created_at'])]
 
+
+class CatalogSearchEvent(models.Model):
+    """Eventos de busca no catálogo para analytics e termos populares."""
+
+    EVENT_SEARCH = 'search'
+    EVENT_POPULAR_CLICK = 'popular_click'
+    EVENT_PURCHASE = 'purchase'
+    EVENT_TYPES = [
+        (EVENT_SEARCH, 'Busca'),
+        (EVENT_POPULAR_CLICK, 'Clique em termo popular'),
+        (EVENT_PURCHASE, 'Compra'),
+    ]
+
+    event_type = models.CharField(max_length=20, choices=EVENT_TYPES, db_index=True)
+    term = models.CharField(max_length=200, blank=True, default='', db_index=True)
+    session_key = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='catalog_searches',
+    )
+    filters = models.JSONField(default=dict, blank=True)
+    result_count = models.PositiveIntegerField(null=True, blank=True)
+    product = models.ForeignKey(
+        Product, on_delete=models.SET_NULL, null=True, blank=True, related_name='search_purchases',
+    )
+    source = models.CharField(max_length=40, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'catalog_search_events'
+        indexes = [
+            models.Index(fields=['term', '-created_at']),
+            models.Index(fields=['event_type', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.event_type}: {self.term or "(sem termo)"}'
+

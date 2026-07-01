@@ -34,13 +34,14 @@ class ProductListSerializer(serializers.ModelSerializer):
     seller_ships_from_platform = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
+    vehicle_models = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
             'id', 'name', 'slug', 'sku', 'oem_code', 'brand', 'price', 'compare_at_price',
             'stock', 'in_stock', 'available_stock', 'image_url', 'is_featured', 'category_name', 'category_slug',
-            'compatible_vehicles', 'seller_name', 'seller_slug', 'seller_is_official', 'seller_ships_from_platform',
+            'compatible_vehicles', 'vehicle_models', 'seller_name', 'seller_slug', 'seller_is_official', 'seller_ships_from_platform',
             'average_rating', 'review_count',
             'part_condition', 'part_origin', 'warranty_days',
         ]
@@ -98,6 +99,21 @@ class ProductListSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'review_count'):
             return obj.review_count or 0
         return 0
+
+    def get_vehicle_models(self, obj):
+        links = getattr(obj, '_prefetched_objects_cache', {}).get('vehicle_compatibilities')
+        if links is None:
+            links = obj.vehicle_compatibilities.select_related('vehicle_model__brand').all()
+        return [
+            {
+                'name': link.vehicle_model.name,
+                'slug': link.vehicle_model.slug,
+                'brand_slug': link.vehicle_model.brand.slug,
+                'year_start': link.year_start if link.year_start is not None else link.vehicle_model.year_start,
+                'year_end': link.year_end if link.year_end is not None else link.vehicle_model.year_end,
+            }
+            for link in links
+        ]
 
 
 class ProductDetailSerializer(serializers.ModelSerializer):

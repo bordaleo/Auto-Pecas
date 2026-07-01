@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
-import { Star, Store, Truck, BadgeCheck } from 'lucide-react';
+import { Star, Store, Truck, BadgeCheck, CheckCircle2, HelpCircle } from 'lucide-react';
 import { formatCurrency } from '../api/client';
 import ProductImage from './ProductImage';
 import { useStore } from '../context/StoreContext';
 import { calcDiscount, calcInstallment } from '../utils/commerce';
+import { getVehicleCompatibility, compatibilityLabel } from '../utils/vehicleCompatibility';
 
 const CONDITION_LABELS = { new: 'Nova', used: 'Usada', reconditioned: 'Recondicionada' };
 const ORIGIN_LABELS = { original: 'OEM', parallel: 'Paralela', remanufactured: 'Remanuf.' };
@@ -35,7 +36,7 @@ function sellerInitials(name) {
     .toUpperCase();
 }
 
-export default function ProductCard({ product, shippingHint, variant = 'default' }) {
+export default function ProductCard({ product, shippingHint, variant = 'default', vehicleFilter }) {
   const { config } = useStore();
   const isCatalog = variant === 'catalog';
   const inStock = product.in_stock !== false && product.stock > 0;
@@ -44,6 +45,8 @@ export default function ProductCard({ product, shippingHint, variant = 'default'
   const installment = calcInstallment(product.price);
   const sellerName = product.seller_name || 'Galelugi Peças';
   const hasRating = product.review_count > 0 && product.average_rating;
+  const compatStatus = isCatalog ? getVehicleCompatibility(product, vehicleFilter) : null;
+  const compatLabel = compatibilityLabel(compatStatus);
 
   const vendorStrip = (product.seller_name || product.seller_is_official || isCatalog) && (
     <div className="gl-card-vendor">
@@ -111,6 +114,17 @@ export default function ProductCard({ product, shippingHint, variant = 'default'
 
         {isCatalog && product.oem_code && (
           <p className="gl-card-oem">OEM {product.oem_code}</p>
+        )}
+
+        {compatLabel && (
+          <span className={`gl-card-compat gl-card-compat--${compatStatus}`}>
+            {compatStatus === 'fits' ? (
+              <CheckCircle2 size={13} aria-hidden="true" />
+            ) : (
+              <HelpCircle size={13} aria-hidden="true" />
+            )}
+            {compatLabel}
+          </span>
         )}
 
         {hasRating && (

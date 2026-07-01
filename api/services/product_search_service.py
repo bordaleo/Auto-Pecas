@@ -1,4 +1,4 @@
-"""Busca de produtos com tokenização e filtros veiculares unificados."""
+"""Busca de produtos com tokenização, sinônimos e filtros veiculares unificados."""
 from __future__ import annotations
 
 import re
@@ -6,6 +6,7 @@ import re
 from django.db.models import Q, QuerySet
 
 from api.models import Product
+from api.services.search_synonyms import expand_token, find_phrase_synonyms, tokenize_query
 
 SEARCH_FIELDS = (
     'name', 'sku', 'oem_code', 'brand', 'compatible_vehicles', 'description',
@@ -15,22 +16,39 @@ TOKEN_SPLIT = re.compile(r'\s+')
 
 
 def _tokens(q: str) -> list[str]:
-    raw = (q or '').strip()
-    if not raw:
-        return []
-    parts = TOKEN_SPLIT.split(raw)
-    return [p for p in parts if len(p) >= 2]
+    return tokenize_query(q)
+
+
+def _field_contains(term: str) -> Q:
+    q = Q()
+    for field in SEARCH_FIELDS:
+        q |= Q(**{f'{field}__icontains': term})
+    return q
 
 
 def apply_text_search(qs: QuerySet, q: str) -> QuerySet:
-    """Cada palavra deve aparecer em ao menos um campo (AND entre tokens)."""
-    tokens = _tokens(q)
-    if not tokens:
+    """Cada palavra deve aparecer em ao menos um campo (AND entre tokens).
+    Sinônimos expandem cada token (OR dentro do token). Frases conhecidas usam OR do grupo."""
+    raw = (q or '').strip()
+    if not raw:
         return qs
+
+    phrase_synonyms = find_phrase_synonyms(raw)
+    if phrase_synonyms:
+        combined = Q()
+        for term in phrase_synonyms:
+            combined |= _field_contains(term)
+        return qs.filter(combined).distinct()
+
+    tokens = _tokens(raw)
+    if not tokens:
+        return qs.filter(_field_contains(raw))
+
     for token in tokens:
+        expansions = expand_token(token)
         token_q = Q()
-        for field in SEARCH_FIELDS:
-            token_q |= Q(**{f'{field}__icontains': token})
+        for exp in expansions:
+            token_q |= _field_contains(exp)
         qs = qs.filter(token_q)
     return qs
 

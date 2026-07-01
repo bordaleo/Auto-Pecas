@@ -29,7 +29,7 @@ from .views.product_views import (
     ProductImageUploadView,
     ProductBrandsView,
 )
-from .views.catalog_views import CatalogFiltersView
+from .views.catalog_views import CatalogFiltersView, CatalogSearchEventView
 from .views.shop_views import (
     CheckoutView,
     ShopPaymentPreferenceView,
@@ -127,6 +127,7 @@ urlpatterns = [
 
     # Catálogo (público)
     path('catalog/filters/', CatalogFiltersView.as_view(), name='catalog-filters'),
+    path('catalog/search-events/', CatalogSearchEventView.as_view(), name='catalog-search-events'),
     path('categories/', CategoryListView.as_view(), name='categories'),
     path('products/', ProductListView.as_view(), name='products'),
     path('products/brands/', ProductBrandsView.as_view(), name='product-brands'),

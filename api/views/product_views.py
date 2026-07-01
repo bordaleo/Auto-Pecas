@@ -54,7 +54,16 @@ class ProductListView(ListAPIView):
 
     def get_queryset(self):
         release_expired_reservations()
-        qs = Product.objects.filter(is_active=True).select_related('category', 'seller')
+        from django.db.models import Avg, Count
+        qs = (
+            Product.objects.filter(is_active=True)
+            .select_related('category', 'seller')
+            .prefetch_related('vehicle_compatibilities__vehicle_model__brand')
+            .annotate(
+                avg_rating=Avg('reviews__rating', filter=Q(reviews__is_visible=True)),
+                review_count=Count('reviews', filter=Q(reviews__is_visible=True)),
+            )
+        )
         q = self.request.query_params.get('q', '').strip()
         category = self.request.query_params.get('category', '').strip()
         brand = self.request.query_params.get('brand', '').strip()

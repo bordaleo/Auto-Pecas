@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, getToken } from '../api/client';
 import { useAuth } from './AuthContext';
+import { trackSearchPurchase } from '../utils/catalogAnalytics';
 
 const CART_KEY = 'galelugi_cart';
 const CartContext = createContext(null);
@@ -76,6 +77,7 @@ export function CartProvider({ children }) {
       else next.push(entry);
       return next;
     });
+    trackSearchPurchase(pid);
     setDrawerOpen(true);
     return true;
   }, []);
