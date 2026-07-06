@@ -1,6 +1,6 @@
 # Galelugi Peças
 
-Marketplace de autopeças inspirado no [Mercado Livre](https://www.mercadolivre.com.br/) — React + Node.js (frontend) e Django (API).
+Marketplace de autopeças inspirado no [Mercado Livre] — React + Node.js (frontend) e Django (API).
 
 ## Stack
 
@@ -63,3 +63,5 @@ O servidor Node na porta 3000 serve o React e faz proxy de `/api` para o Django.
 - `MERCADOPAGO_ACCESS_TOKEN` + `MERCADOPAGO_PUBLIC_KEY` — pagamentos
 - `FRONTEND_URL` — padrão `http://localhost:3000`
 - `CORS_ALLOWED_ORIGINS` — incluir origem do React
+
+---
