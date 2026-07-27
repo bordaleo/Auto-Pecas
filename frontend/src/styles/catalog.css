@@ -711,17 +711,6 @@
   align-items: center;
 }
 
-.gl-card-category {
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--gl-copper);
-  background: rgba(232, 98, 26, 0.08);
-  padding: 0.15rem 0.45rem;
-  border-radius: 4px;
-}
-
 .gl-card--catalog .gl-card-brand {
   font-size: 0.68rem;
 }
@@ -746,56 +735,13 @@
   font-weight: 500;
 }
 
-.gl-card-price-block {
-  margin-top: 0.35rem;
-}
-
 .gl-card--catalog .gl-card-price {
-  display: block;
   font-size: 1.45rem;
   line-height: 1.1;
 }
 
 .gl-card--catalog .gl-card-installment {
-  display: block;
-  margin-top: 0.2rem;
   font-size: 0.76rem;
-  color: var(--gl-muted);
-}
-
-.gl-card--catalog .gl-card-installment strong {
-  color: var(--gl-copper);
-}
-
-.gl-card-badges-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.65rem;
-}
-
-.gl-card-pill {
-  font-size: 0.68rem;
-  font-weight: 700;
-  padding: 0.22rem 0.5rem;
-  border-radius: 999px;
-  background: var(--gl-cream);
-  color: var(--gl-muted);
-}
-
-.gl-card-pill--stock {
-  background: rgba(5, 150, 105, 0.1);
-  color: #059669;
-}
-
-.gl-card-pill--ship {
-  background: rgba(232, 98, 26, 0.1);
-  color: var(--gl-copper);
-}
-
-.gl-card-pill--oos {
-  background: #fef2f2;
-  color: #b91c1c;
 }
 
 .gl-card-tag--discount {

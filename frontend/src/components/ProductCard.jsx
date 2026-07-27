@@ -47,8 +47,9 @@ export default function ProductCard({ product, shippingHint, variant = 'default'
   const hasRating = product.review_count > 0 && product.average_rating;
   const compatStatus = isCatalog ? getVehicleCompatibility(product, vehicleFilter) : null;
   const compatLabel = compatibilityLabel(compatStatus);
+  const showSeller = Boolean(product.seller_name || product.seller_is_official);
 
-  const vendorStrip = (product.seller_name || product.seller_is_official || isCatalog) && (
+  const vendorStrip = (showSeller || isCatalog) && (
     <div className="gl-card-vendor">
       <div className="gl-card-vendor__avatar" aria-hidden="true">
         {sellerInitials(sellerName)}
@@ -101,12 +102,14 @@ export default function ProductCard({ product, shippingHint, variant = 'default'
       </Link>
 
       <div className="gl-card-body">
-        <div className="gl-card-meta">
-          {product.category_name && (
-            <span className="gl-card-category">{product.category_name}</span>
-          )}
-          {product.brand && <span className="gl-card-brand">{product.brand}</span>}
-        </div>
+        {(product.category_name || product.brand) && (
+          <div className="gl-card-meta">
+            {product.category_name && (
+              <span className="gl-card-category">{product.category_name}</span>
+            )}
+            {product.brand && <span className="gl-card-brand">{product.brand}</span>}
+          </div>
+        )}
 
         <h3 className="gl-card-title">
           <Link to={`/peca/${product.slug}/`}>{product.name}</Link>
@@ -164,20 +167,19 @@ export default function ProductCard({ product, shippingHint, variant = 'default'
 
         {shippingHint && <div className="gl-card-cep-hint">{shippingHint}</div>}
 
-        {!isCatalog && (
+        {!isCatalog && showSeller && (
           <div className="gl-card-foot">
-            {(product.seller_name || product.seller_is_official) && (
-              <div className="gl-card-seller-row">
-                <Store size={12} aria-hidden="true" />
-                {product.seller_slug ? (
-                  <Link to={`/loja/${product.seller_slug}/`} className="gl-card-seller">
-                    {sellerName}
-                  </Link>
-                ) : (
-                  <span className="gl-card-seller">{sellerName}</span>
-                )}
-              </div>
-            )}
+            <div className="gl-card-seller-row">
+              <Store size={12} aria-hidden="true" />
+              <span className="gl-card-seller-label">Vendido por</span>
+              {product.seller_slug ? (
+                <Link to={`/loja/${product.seller_slug}/`} className="gl-card-seller">
+                  {sellerName}
+                </Link>
+              ) : (
+                <span className="gl-card-seller">{sellerName}</span>
+              )}
+            </div>
           </div>
         )}
       </div>

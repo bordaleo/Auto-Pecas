@@ -2,17 +2,44 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import ProductCard from '../components/ProductCard';
+import PageLoader from '../components/ui/PageLoader';
 import SectionHeader from '../components/SectionHeader';
 
 export default function SellerStore() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    api(`/seller/store/${slug}/`).then(setData).catch(() => setData(null));
+    let cancelled = false;
+    setLoading(true);
+    setNotFound(false);
+    api(`/seller/store/${slug}/`)
+      .then((d) => {
+        if (!cancelled) setData(d);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setData(null);
+          setNotFound(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [slug]);
 
-  if (!data) {
+  if (loading) {
+    return (
+      <div className="wrap home-section" style={{ marginTop: '1.25rem' }}>
+        <PageLoader label="Carregando loja..." />
+      </div>
+    );
+  }
+
+  if (notFound || !data) {
     return <div className="wrap"><p className="state-empty">Loja não encontrada.</p></div>;
   }
 

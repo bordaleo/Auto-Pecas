@@ -12,12 +12,42 @@ from api.services.melhor_envio_service import calculate_shipping_with_provider
 from api.services.shipping_origin import resolve_shipping_origin
 from api.services.shipping_service import get_pickup_address
 from api.services.stock_reservation_service import (
-    get_available_stock, create_reservations_for_order,
+    get_available_stock,
+    create_reservations_for_order,
+    release_order_reservations,
 )
 
 
 def _seller_key(seller) -> str:
     return str(seller.id) if seller else 'platform'
+
+
+def release_user_pending_checkout_reservations(user) -> int:
+    """
+    Libera estoque preso em checkouts pendentes (não pagos) do usuário.
+    Evita 'Disponível: 0' ao tentar finalizar de novo após abandonar o pagamento.
+    """
+    from django.db.models import Q
+
+    pending_ids = list(
+        Order.objects.filter(user=user, status=OrderStatus.PENDING)
+        .filter(Q(payment_id__isnull=True) | Q(payment_id=''))
+        .values_list('id', flat=True)
+    )
+    group_ids = set(
+        Order.objects.filter(id__in=pending_ids, order_group_id__isnull=False)
+        .values_list('order_group_id', flat=True)
+    )
+    for order_id in pending_ids:
+        release_order_reservations(order_id)
+        Order.objects.filter(pk=order_id, status=OrderStatus.PENDING).update(
+            status=OrderStatus.REJECTED,
+        )
+    if group_ids:
+        OrderGroup.objects.filter(id__in=group_ids, status=OrderStatus.PENDING).update(
+            status=OrderStatus.REJECTED,
+        )
+    return len(pending_ids)
 
 
 def group_cart_items(order_items_data: list[dict]) -> dict[str, list]:
@@ -126,7 +156,7 @@ def create_orders_from_cart(user, data, order_items_data: list[dict], discount_a
         for item_data in items:
             OrderItem.objects.create(order=order, **{
                 k: v for k, v in item_data.items()
-                if k not in ('weight_kg', 'width_cm', 'height_cm')
+                if k not in ('weight_kg', 'width_cm', 'height_cm', 'length_cm')
             })
             reservation_items.append({
                 'product': item_data['product'],

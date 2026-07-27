@@ -450,6 +450,30 @@ html[data-theme="light"] .hero-panel {
   box-shadow: var(--gl-glass-shadow-lg);
 }
 
+html[data-theme="light"] .form-hint,
+html[data-theme="light"] .payment-panel-total,
+html[data-theme="light"] .payment-redirect-hint,
+html[data-theme="light"] .payment-option__body span,
+html[data-theme="light"] .checkout-section-lead,
+html[data-theme="light"] .coupon-hint {
+  color: #475569;
+}
+
+html[data-theme="light"] .payment-panel-total strong,
+html[data-theme="light"] .payment-option__body strong,
+html[data-theme="light"] .checkout-section-title {
+  color: #0f1c2e;
+}
+
+html[data-theme="light"] .checkout-section-title {
+  border-bottom-color: #e2e8f0;
+}
+
+html[data-theme="light"] .payment-option {
+  background: #fff;
+  border-color: #e2e8f0;
+}
+
 html[data-theme="light"] .state-empty:not(.internal-page-card .state-empty) {
   color: #64748b;
 }

@@ -142,9 +142,12 @@ body {
 .wrap .hub-layout-lead,
 .wrap .page-lead,
 .account-hub-head p,
-.internal-page-head p,
-.form-hint {
+.internal-page-head p {
   color: rgba(226, 232, 240, 0.72);
+}
+
+.form-hint {
+  color: var(--gl-muted);
 }
 
 .wrap .eyebrow {

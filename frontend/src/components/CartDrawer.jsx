@@ -26,7 +26,12 @@ export default function CartDrawer() {
       <aside className="drawer" role="dialog" aria-label="Carrinho">
         <div className="drawer-header">
           <strong>Seu carrinho</strong>
-          <button type="button" className="btn-ghost" onClick={() => setDrawerOpen(false)}>
+          <button
+            type="button"
+            className="btn-ghost drawer-close"
+            onClick={() => setDrawerOpen(false)}
+            aria-label="Fechar carrinho"
+          >
             Fechar
           </button>
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
+import { Truck, MapPin, Store, CreditCard, ExternalLink } from 'lucide-react';
 import { api, formatCurrency, getToken } from '../api/client';
 import PixPaymentPanel from '../components/PixPaymentPanel';
 import { useAuth } from '../context/AuthContext';
@@ -39,7 +40,10 @@ export default function Checkout() {
   const [shippingFee, setShippingFee] = useState(0);
   const [shippingLabel, setShippingLabel] = useState('Informe o CEP');
   const [shippingBreakdown, setShippingBreakdown] = useState([]);
+  const [checkoutStep, setCheckoutStep] = useState('shipping');
   const [showPayment, setShowPayment] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [payOption, setPayOption] = useState('methods'); // methods | redirect
   const [paymentUrl, setPaymentUrl] = useState('');
   const [preferenceId, setPreferenceId] = useState('');
   const [orderAmount, setOrderAmount] = useState(total);
@@ -160,7 +164,6 @@ export default function Checkout() {
       const d = parseFloat(result.discount_amount) || 0;
       setDiscount(d);
       setCouponLabel(`Cupom ${result.code} aplicado`);
-      showToast(`Desconto de ${formatCurrency(d)}`);
     } catch (error) {
       setDiscount(0);
       setCouponLabel('');
@@ -262,7 +265,6 @@ export default function Checkout() {
             debitCard: 'all',
             ticket: 'all',
             bankTransfer: 'all',
-            mercadoPago: 'all',
             maxInstallments: 12,
           },
         },
@@ -270,7 +272,7 @@ export default function Checkout() {
           onReady: () => setBrickError(''),
           onError: (error) => {
             const msg = error?.message || 'Não foi possível carregar o formulário de pagamento.';
-            setBrickError(`${msg} Use o botão "Pagar no Mercado Pago" acima.`);
+            setBrickError(`${msg} Selecione "Mercado Pago" acima para abrir a página do Mercado Pago.`);
           },
           onSubmit: ({ formData }) => new Promise((resolve, reject) => {
             api('/payments/process', {
@@ -288,9 +290,18 @@ export default function Checkout() {
         },
       });
     } catch (error) {
-      setBrickError('Formulário indisponível. Use o botão "Pagar no Mercado Pago" acima.');
+      setBrickError('Formulário indisponível. Selecione a opção Mercado Pago acima.');
     }
   };
+
+  useEffect(() => {
+    if (checkoutStep !== 'payment' || payOption !== 'methods' || !preferenceId || pixPayment) return undefined;
+    const timer = setTimeout(() => {
+      const payerEmail = form.order_email || user?.email || '';
+      initBrick(preferenceId, orderAmount, payerEmail);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [checkoutStep, payOption, preferenceId, pixPayment]);
 
   const validateCheckout = () => {
     if (deliveryMethod === 'delivery') {
@@ -311,10 +322,17 @@ export default function Checkout() {
     return true;
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const goToPaymentStep = async (event) => {
+    event?.preventDefault?.();
+    if (preferenceId) {
+      setCheckoutStep('payment');
+      setShowPayment(true);
+      return;
+    }
     if (!validateCheckout()) return;
+    if (submitting) return;
 
+    setSubmitting(true);
     try {
       await quoteShipping();
       const order = await api('/shop/checkout/', {
@@ -337,16 +355,19 @@ export default function Checkout() {
       setSubOrders(order.sub_orders || []);
       setOrderGroupId(order.order_group_id || null);
       setShowPayment(true);
+      setCheckoutStep('payment');
+      setPayOption('methods');
       setBrickError('');
       setPixPayment(null);
-      const payerEmail = form.order_email || user?.email || '';
-      const brickAmount = pref.brick_amount ?? parseFloat(order.total_amount || order.amount);
-      await initBrick(pref.preference_id, brickAmount, payerEmail);
-      showToast('Pedido criado! Escolha como pagar abaixo.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       showToast(error.message);
+    } finally {
+      setSubmitting(false);
     }
   };
+
+  const itemCount = items.reduce((sum, item) => sum + (item.quantity || 1), 0);
 
   if (!getToken()) {
     return (
@@ -377,185 +398,394 @@ export default function Checkout() {
         <h1>Finalizar compra</h1>
         <p>Pagamento seguro via Mercado Pago · PIX, cartão ou boleto</p>
       </header>
-      <div className="checkout-grid internal-page-grid">
-      <form className="internal-page-card checkout-page" onSubmit={handleSubmit}>
-        <h2 className="checkout-section-title">Como receber</h2>
-        <div className="delivery-options">
-          <label className={`delivery-option${deliveryMethod === 'delivery' ? ' active' : ''}`}>
-            <input
-              type="radio"
-              name="delivery_method"
-              value="delivery"
-              checked={deliveryMethod === 'delivery'}
-              onChange={() => setDeliveryMethod('delivery')}
-            />
-            <div>
-              <strong>Entrega</strong>
-              <div style={{ fontSize: '0.82rem', color: 'rgba(0,0,0,.55)' }}>
-                Frete pelo CEP · grátis acima de {formatCurrency(freeMin)}
+
+      <nav className="checkout-steps" aria-label="Etapas do checkout">
+        <button
+          type="button"
+          className={`checkout-step${checkoutStep === 'shipping' ? ' is-active' : ''}${checkoutStep === 'payment' ? ' is-done' : ''}`}
+          onClick={() => setCheckoutStep('shipping')}
+        >
+          <span className="checkout-step__num">1</span>
+          <span className="checkout-step__label">Frete e dados</span>
+        </button>
+        <span className="checkout-steps__divider" aria-hidden="true" />
+        <button
+          type="button"
+          className={`checkout-step${checkoutStep === 'payment' ? ' is-active' : ''}`}
+          onClick={() => goToPaymentStep()}
+        >
+          <span className="checkout-step__num">2</span>
+          <span className="checkout-step__label">Pagamento</span>
+        </button>
+      </nav>
+
+      {checkoutStep === 'shipping' ? (
+        <form className="internal-page-card checkout-page checkout-step-panel" onSubmit={goToPaymentStep}>
+          <section className="checkout-block">
+            <header className="checkout-block__head">
+              <h2 className="checkout-section-title">Como receber</h2>
+              <p className="checkout-section-lead">Escolha entrega em casa ou retirada na loja.</p>
+            </header>
+
+            <div className="delivery-options">
+              <label className={`delivery-option${deliveryMethod === 'delivery' ? ' active' : ''}`}>
+                <input
+                  type="radio"
+                  name="delivery_method"
+                  value="delivery"
+                  checked={deliveryMethod === 'delivery'}
+                  onChange={() => setDeliveryMethod('delivery')}
+                  disabled={Boolean(preferenceId)}
+                />
+                <span className="delivery-option__icon" aria-hidden="true">
+                  <Truck size={20} />
+                </span>
+                <div className="delivery-option__content">
+                  <strong>Receber em casa</strong>
+                  <span>Frete pelo CEP · grátis acima de {formatCurrency(freeMin)}</span>
+                </div>
+              </label>
+              <label className={`delivery-option${deliveryMethod === 'pickup' ? ' active' : ''}`}>
+                <input
+                  type="radio"
+                  name="delivery_method"
+                  value="pickup"
+                  checked={deliveryMethod === 'pickup'}
+                  onChange={() => setDeliveryMethod('pickup')}
+                  disabled={Boolean(preferenceId)}
+                />
+                <span className="delivery-option__icon" aria-hidden="true">
+                  <Store size={20} />
+                </span>
+                <div className="delivery-option__content">
+                  <strong>Retirar na loja</strong>
+                  <span>Sem frete · {config.store_address || 'endereço da loja'}</span>
+                </div>
+              </label>
+            </div>
+
+            {deliveryMethod === 'delivery' ? (
+              <div className="checkout-address">
+                <h3 className="checkout-subsection-title">
+                  <MapPin size={16} aria-hidden="true" />
+                  Endereço de entrega
+                </h3>
+                <div className="checkout-address-grid">
+                  <div className="form-group checkout-field--cep">
+                    <label htmlFor="checkout-zip">CEP *</label>
+                    <input
+                      id="checkout-zip"
+                      value={form.shipping_zip}
+                      onChange={(e) => setForm({ ...form, shipping_zip: e.target.value })}
+                      onBlur={() => quoteShipping('delivery', form.shipping_zip)}
+                      placeholder="00000-000"
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                      disabled={Boolean(preferenceId)}
+                    />
+                    <p className={`checkout-shipping-feedback${shippingFee === 0 && shippingLabel !== 'Informe o CEP' ? ' is-free' : ''}`}>
+                      {shippingLabel}
+                    </p>
+                  </div>
+                  <div className="form-group checkout-field--city">
+                    <label htmlFor="checkout-city">Cidade *</label>
+                    <input
+                      id="checkout-city"
+                      value={form.shipping_city}
+                      onChange={(e) => setForm({ ...form, shipping_city: e.target.value })}
+                      required
+                      autoComplete="address-level2"
+                      disabled={Boolean(preferenceId)}
+                    />
+                  </div>
+                  <div className="form-group checkout-field--uf">
+                    <label htmlFor="checkout-uf">UF *</label>
+                    <input
+                      id="checkout-uf"
+                      value={form.shipping_state}
+                      onChange={(e) => setForm({ ...form, shipping_state: e.target.value.toUpperCase() })}
+                      maxLength={2}
+                      required
+                      autoComplete="address-level1"
+                      placeholder="SP"
+                      disabled={Boolean(preferenceId)}
+                    />
+                  </div>
+                  <div className="form-group checkout-field--full">
+                    <label htmlFor="checkout-address">Endereço *</label>
+                    <input
+                      id="checkout-address"
+                      value={form.shipping_address}
+                      onChange={(e) => setForm({ ...form, shipping_address: e.target.value })}
+                      required
+                      autoComplete="street-address"
+                      placeholder="Rua, número e complemento"
+                      disabled={Boolean(preferenceId)}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="checkout-pickup-note">
+                <Store size={18} aria-hidden="true" />
+                <div>
+                  <strong>Retirada sem frete</strong>
+                  <p>Após o pagamento, avisamos por e-mail quando a peça estiver pronta.</p>
+                  {config.store_address && <p className="checkout-pickup-note__addr">{config.store_address}</p>}
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="checkout-block">
+            <header className="checkout-block__head">
+              <h2 className="checkout-section-title">Seus dados</h2>
+            </header>
+            <div className="checkout-customer-grid">
+              <div className="form-group checkout-field--full">
+                <label htmlFor="checkout-name">Nome completo</label>
+                <input
+                  id="checkout-name"
+                  value={form.customer_name}
+                  onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
+                  required
+                  autoComplete="name"
+                  disabled={Boolean(preferenceId)}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="checkout-phone">Telefone</label>
+                <input
+                  id="checkout-phone"
+                  value={form.customer_phone}
+                  onChange={(e) => setForm({ ...form, customer_phone: e.target.value })}
+                  autoComplete="tel"
+                  disabled={Boolean(preferenceId)}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="checkout-email">Email</label>
+                <input
+                  id="checkout-email"
+                  type="email"
+                  value={form.order_email}
+                  onChange={(e) => setForm({ ...form, order_email: e.target.value })}
+                  required
+                  autoComplete="email"
+                  disabled={Boolean(preferenceId)}
+                />
+              </div>
+              <div className="form-group checkout-field--full">
+                <label htmlFor="checkout-notes">Observações <span className="checkout-optional">(opcional)</span></label>
+                <textarea
+                  id="checkout-notes"
+                  rows={2}
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  placeholder="Referência de entrega, horário preferido…"
+                  disabled={Boolean(preferenceId)}
+                />
               </div>
             </div>
-          </label>
-          <label className={`delivery-option${deliveryMethod === 'pickup' ? ' active' : ''}`}>
-            <input
-              type="radio"
-              name="delivery_method"
-              value="pickup"
-              checked={deliveryMethod === 'pickup'}
-              onChange={() => setDeliveryMethod('pickup')}
-            />
-            <div>
-              <strong>Retirada na loja</strong>
-              <div style={{ fontSize: '0.82rem', color: 'rgba(0,0,0,.55)' }}>
-                {config.store_address || 'Endereço da loja'} · sem frete
+          </section>
+
+          <section className="checkout-block checkout-block--summary">
+            <header className="checkout-block__head">
+              <h2 className="checkout-section-title">Cupom e total</h2>
+            </header>
+            <div className="checkout-coupon">
+              <label htmlFor="checkout-coupon">Cupom de desconto</label>
+              <div className="coupon-row">
+                <input
+                  id="checkout-coupon"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  placeholder="BEMVINDO10"
+                  autoComplete="off"
+                  disabled={Boolean(preferenceId)}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={applyCoupon}
+                  disabled={Boolean(preferenceId)}
+                >
+                  Aplicar
+                </button>
               </div>
+              {couponLabel && <p className="coupon-applied">{couponLabel}</p>}
+              <p className="coupon-hint">Primeira compra? Use <strong>BEMVINDO10</strong> (10% off)</p>
             </div>
-          </label>
-        </div>
 
-        {deliveryMethod === 'delivery' && (
-          <>
-            <h2 className="checkout-section-title">Endereço de entrega</h2>
-            <div className="form-group">
-              <label>CEP *</label>
-              <input
-                value={form.shipping_zip}
-                onChange={(e) => setForm({ ...form, shipping_zip: e.target.value })}
-                onBlur={() => quoteShipping('delivery', form.shipping_zip)}
-                placeholder="00000-000"
-              />
-            </div>
-            <div className="form-group">
-              <label>Endereço *</label>
-              <input value={form.shipping_address} onChange={(e) => setForm({ ...form, shipping_address: e.target.value })} required />
-            </div>
-            <div className="form-group">
-              <label>Cidade *</label>
-              <input value={form.shipping_city} onChange={(e) => setForm({ ...form, shipping_city: e.target.value })} required />
-            </div>
-            <div className="form-group">
-              <label>UF *</label>
-              <input value={form.shipping_state} onChange={(e) => setForm({ ...form, shipping_state: e.target.value.toUpperCase() })} maxLength={2} required />
-            </div>
-          </>
-        )}
-
-        <h2 className="checkout-section-title">Seus dados</h2>
-        <div className="form-group">
-          <label>Nome completo</label>
-          <input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} required />
-        </div>
-        <div className="form-group">
-          <label>Telefone</label>
-          <input value={form.customer_phone} onChange={(e) => setForm({ ...form, customer_phone: e.target.value })} />
-        </div>
-        <div className="form-group">
-          <label>Email</label>
-          <input type="email" value={form.order_email} onChange={(e) => setForm({ ...form, order_email: e.target.value })} required />
-        </div>
-        <div className="form-group">
-          <label>Observações</label>
-          <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-        </div>
-
-        <div className="form-group coupon-group">
-          <label>Cupom de desconto</label>
-          <div className="coupon-row">
-            <input
-              value={couponCode}
-              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-              placeholder="BEMVINDO10"
-            />
-            <button type="button" className="btn btn-secondary btn-sm" onClick={applyCoupon}>Aplicar</button>
-          </div>
-          {couponLabel && <p className="coupon-applied">{couponLabel}</p>}
-          <p className="coupon-hint">Primeira compra? Use <strong>BEMVINDO10</strong> (10% off)</p>
-        </div>
-
-        <div className="summary-card">
-          <div className="summary-row"><span>Subtotal ({items.length} item(ns))</span><span>{formatCurrency(total)}</span></div>
-          <div className="summary-row"><span>Frete</span><span>{shippingLabel}</span></div>
-          {shippingBreakdown.length > 1 && (
-            <div className="checkout-shipping-breakdown">
-              {shippingBreakdown.map((row) => (
-                <div key={row.seller_key} className="checkout-shipping-row">
-                  <span>
-                    {row.store_name}
-                    {row.is_official && <span className="store-badge store-badge--sm">Oficial</span>}
-                    {row.ships_from_platform && !row.is_official && (
-                      <span className="store-badge store-badge--sm store-badge--ship">Envio Sandroni</span>
-                    )}
-                  </span>
-                  <span>
-                    {parseFloat(row.shipping_fee) === 0
-                      ? 'Grátis'
-                      : formatCurrency(row.shipping_fee)}
-                  </span>
+            <div className="summary-card checkout-summary">
+              <div className="summary-row">
+                <span>Subtotal ({itemCount} item{itemCount === 1 ? '' : 's'})</span>
+                <span>{formatCurrency(total)}</span>
+              </div>
+              <div className="summary-row">
+                <span>Frete</span>
+                <span>{shippingLabel}</span>
+              </div>
+              {discount > 0 && (
+                <div className="summary-row summary-discount">
+                  <span>Desconto</span>
+                  <span>- {formatCurrency(discount)}</span>
                 </div>
-              ))}
-            </div>
-          )}
-          {discount > 0 && (
-            <div className="summary-row summary-discount"><span>Desconto</span><span>- {formatCurrency(discount)}</span></div>
-          )}
-          <div className="summary-row summary-total"><span>Total</span><span>{formatCurrency(orderAmount)}</span></div>
-        </div>
-
-        {!showPayment && (
-          <button type="submit" className="btn btn-accent btn-full" style={{ marginTop: '1rem' }}>
-            Continuar para pagamento
-          </button>
-        )}
-      </form>
-
-      {showPayment && (
-        <div className="internal-page-card checkout-page payment-panel">
-          <h2 className="checkout-section-title">Pagamento Mercado Pago</h2>
-          <p className="form-hint payment-panel-total">
-            Total do pedido: <strong>{formatCurrency(orderAmount)}</strong>
-            {orderGroupId && ` · Compra #${orderGroupId}`}
-          </p>
-
-          {subOrders.length > 1 && (
-            <div className="checkout-sub-orders">
-              <h3>Entregas por loja</h3>
-              {subOrders.map((sub) => (
-                <div key={sub.id} className="checkout-sub-order">
-                  <strong>{sub.store_label || sub.fulfillment_seller_name}</strong>
-                  <span>
-                    {formatCurrency(sub.amount)}
-                    {sub.shipping_fee > 0 ? ` · Frete ${formatCurrency(sub.shipping_fee)}` : ' · Frete grátis'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {pixPayment ? (
-            <PixPaymentPanel
-              amount={orderAmount}
-              qrCode={pixPayment.qrCode}
-              qrCodeBase64={pixPayment.qrCodeBase64}
-              onCopy={() => showToast('Código PIX copiado!')}
-            />
-          ) : (
-            <>
-              {paymentUrl && (
-                <a href={paymentUrl} className="btn btn-accent btn-full payment-redirect-btn">
-                  Pagar no Mercado Pago (recomendado)
-                </a>
               )}
-              <p className="form-hint payment-redirect-hint">
-                Abre a página segura do Mercado Pago. Funciona melhor se o formulário abaixo não carregar (ex.: Edge com bloqueio de rastreamento).
-              </p>
+              <div className="summary-row summary-total">
+                <span>Total</span>
+                <span>{formatCurrency(orderAmount)}</span>
+              </div>
+            </div>
+          </section>
 
-              {brickError && <p className="payment-brick-error">{brickError}</p>}
-              <div id="paymentBrick_container" ref={brickRef} className="payment-brick-host" />
-            </>
-          )}
+          <button type="submit" className="btn btn-accent btn-full checkout-continue-btn" disabled={submitting}>
+            {submitting ? 'Criando pedido...' : 'Continuar para pagamento'}
+          </button>
+        </form>
+      ) : (
+        <div className="checkout-payment-layout">
+          <aside className="internal-page-card checkout-page checkout-summary-panel">
+            <h2 className="checkout-section-title">Resumo do pedido</h2>
+            {couponLabel && <p className="coupon-applied">{couponLabel}</p>}
+            <div className="summary-card checkout-summary">
+              <div className="summary-row">
+                <span>Subtotal ({itemCount} item{itemCount === 1 ? '' : 's'})</span>
+                <span>{formatCurrency(total)}</span>
+              </div>
+              <div className="summary-row">
+                <span>Frete</span>
+                <span>{shippingLabel}</span>
+              </div>
+              {shippingBreakdown.length > 1 && (
+                <div className="checkout-shipping-breakdown">
+                  {shippingBreakdown.map((row) => (
+                    <div key={row.seller_key} className="checkout-shipping-row">
+                      <span>
+                        {row.store_name}
+                        {row.is_official && <span className="store-badge store-badge--sm">Oficial</span>}
+                        {row.ships_from_platform && !row.is_official && (
+                          <span className="store-badge store-badge--sm store-badge--ship">Envio Sandroni</span>
+                        )}
+                      </span>
+                      <span>
+                        {parseFloat(row.shipping_fee) === 0
+                          ? 'Grátis'
+                          : formatCurrency(row.shipping_fee)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {discount > 0 && (
+                <div className="summary-row summary-discount">
+                  <span>Desconto</span>
+                  <span>- {formatCurrency(discount)}</span>
+                </div>
+              )}
+              <div className="summary-row summary-total">
+                <span>Total</span>
+                <span>{formatCurrency(orderAmount)}</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-secondary btn-full"
+              onClick={() => setCheckoutStep('shipping')}
+            >
+              Voltar para frete e dados
+            </button>
+          </aside>
+
+          <div className="internal-page-card checkout-page payment-panel">
+            <h2 className="checkout-section-title">Pagamento</h2>
+            <p className="payment-panel-total">
+              Total do pedido: <strong>{formatCurrency(orderAmount)}</strong>
+              {orderGroupId && <span className="payment-panel-order"> · Compra #{orderGroupId}</span>}
+            </p>
+
+            {subOrders.length > 1 && (
+              <div className="checkout-sub-orders">
+                <h3>Entregas por loja</h3>
+                {subOrders.map((sub) => (
+                  <div key={sub.id} className="checkout-sub-order">
+                    <strong>{sub.store_label || sub.fulfillment_seller_name}</strong>
+                    <span>
+                      {formatCurrency(sub.amount)}
+                      {sub.shipping_fee > 0 ? ` · Frete ${formatCurrency(sub.shipping_fee)}` : ' · Frete grátis'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {pixPayment ? (
+              <PixPaymentPanel
+                amount={orderAmount}
+                qrCode={pixPayment.qrCode}
+                qrCodeBase64={pixPayment.qrCodeBase64}
+                onCopy={() => showToast('Código PIX copiado!')}
+              />
+            ) : (
+              <>
+                <div className="payment-options" role="radiogroup" aria-label="Forma de pagamento">
+                  <label className={`payment-option${payOption === 'methods' ? ' is-active' : ''}`}>
+                    <input
+                      type="radio"
+                      name="pay_option"
+                      value="methods"
+                      checked={payOption === 'methods'}
+                      onChange={() => setPayOption('methods')}
+                    />
+                    <span className="payment-option__icon" aria-hidden="true">
+                      <CreditCard size={18} />
+                    </span>
+                    <span className="payment-option__body">
+                      <strong>Cartão, PIX ou boleto</strong>
+                      <span>Pague nesta página com segurança</span>
+                    </span>
+                  </label>
+                  {paymentUrl && (
+                    <label className={`payment-option${payOption === 'redirect' ? ' is-active' : ''}`}>
+                      <input
+                        type="radio"
+                        name="pay_option"
+                        value="redirect"
+                        checked={payOption === 'redirect'}
+                        onChange={() => setPayOption('redirect')}
+                      />
+                      <span className="payment-option__icon" aria-hidden="true">
+                        <ExternalLink size={18} />
+                      </span>
+                      <span className="payment-option__body">
+                        <strong>Mercado Pago</strong>
+                        <span>Abrir a página do Mercado Pago</span>
+                      </span>
+                    </label>
+                  )}
+                </div>
+
+                {payOption === 'redirect' && paymentUrl ? (
+                  <div className="payment-redirect-box">
+                    <p className="payment-redirect-hint">
+                      Você será direcionado ao site do Mercado Pago para concluir o pagamento.
+                    </p>
+                    <a href={paymentUrl} className="btn btn-accent btn-full payment-redirect-btn">
+                      Continuar no Mercado Pago
+                    </a>
+                  </div>
+                ) : (
+                  <>
+                    {brickError && <p className="payment-brick-error">{brickError}</p>}
+                    <div id="paymentBrick_container" ref={brickRef} className="payment-brick-host" />
+                  </>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
-      </div>
     </div>
   );
 }

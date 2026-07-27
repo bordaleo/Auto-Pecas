@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Car, ChevronRight, RotateCcw, Search, SlidersHorizontal, X } from 'lucide-react';
 import { fetchCatalogFilters, productList, productCount, api } from '../api/client';
 import ProductCard from '../components/ProductCard';
+import ProductGridSkeleton from '../components/ProductGridSkeleton';
 import VehicleFinder from '../components/VehicleFinder';
 import { trackPopularClick, trackSearch } from '../utils/catalogAnalytics';
 
@@ -691,7 +692,10 @@ export default function Catalog() {
             </select>
           </div>
 
-          <div className="product-grid product-grid--catalog">
+          {loading && !products.length ? (
+            <ProductGridSkeleton count={8} catalog />
+          ) : (
+          <div className={`product-grid product-grid--catalog${loading ? ' is-refreshing' : ''}`}>
             {products.length ? (
               products.map((product) => (
                 <ProductCard
@@ -815,6 +819,7 @@ export default function Catalog() {
               </div>
             ) : null}
           </div>
+          )}
 
           {hasMore && products.length > 0 && (
             <div className="catalog-load-more">

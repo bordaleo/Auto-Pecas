@@ -77,7 +77,7 @@ class ShopOrderSerializer(serializers.ModelSerializer):
     shipping_status_display = serializers.CharField(source='get_shipping_status_display', read_only=True)
     subtotal = serializers.SerializerMethodField()
     tracking_url = serializers.SerializerMethodField()
-    order_group_id = serializers.IntegerField(source='order_group_id', read_only=True, allow_null=True)
+    order_group_id = serializers.IntegerField(read_only=True, allow_null=True)
     fulfillment_seller_name = serializers.CharField(
         source='fulfillment_seller.store_name', read_only=True, default='Galelugi Peças',
     )

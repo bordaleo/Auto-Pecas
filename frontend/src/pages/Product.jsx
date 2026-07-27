@@ -84,7 +84,7 @@ export default function Product() {
   const waUrl = buildWhatsAppProductUrl(whatsappUrl, product);
 
   const handleAdd = () => {
-    if (addItem(product, qty)) showToast(`${product.name} adicionado ao carrinho`);
+    addItem(product, qty);
   };
 
   const quoteZip = () => {
@@ -125,18 +125,15 @@ export default function Product() {
       </div>
 
       <div className="product-info">
-        <div className="tags">
-          {product.seller_name && (
-            <Link to={`/loja/${product.seller_slug}/`} className="tag tag--seller">
-              Vendido por {product.seller_name}
-            </Link>
-          )}
-          {product.category && <span className="tag">{product.category.name}</span>}
-          {product.brand && <span className="tag">{product.brand}</span>}
-          {product.sku && <span className="tag">SKU {product.sku}</span>}
-          {product.oem_code && <span className="tag">OEM {product.oem_code}</span>}
-        </div>
+        {product.seller_name && (
+          <p className="product-seller">
+            Vendido por{' '}
+            <Link to={`/loja/${product.seller_slug}/`}>{product.seller_name}</Link>
+          </p>
+        )}
+
         <h1>{product.name}</h1>
+
         <div className="part-badges">
           {product.part_condition && (
             <span className="part-badge">
@@ -152,10 +149,59 @@ export default function Product() {
             <span className="part-badge">Garantia {product.warranty_days} dias</span>
           )}
         </div>
-        <div className="product-price">{formatCurrency(product.price)}</div>
-        <div className="product-promo-banner">
-          <span>em <strong>12x {calcInstallment(product.price)}</strong> sem juros</span>
-          {Number(product.price) >= freeMin && <span className="product-free-ship">Frete grátis</span>}
+
+        {(product.brand || product.category || product.sku || product.oem_code) && (
+          <dl className="product-specs">
+            {product.brand && (
+              <div className="product-spec">
+                <dt>Marca</dt>
+                <dd>{product.brand}</dd>
+              </div>
+            )}
+            {product.category && (
+              <div className="product-spec">
+                <dt>Categoria</dt>
+                <dd>{product.category.name}</dd>
+              </div>
+            )}
+            {product.sku && (
+              <div className="product-spec">
+                <dt>SKU</dt>
+                <dd>{product.sku}</dd>
+              </div>
+            )}
+            {product.oem_code && (
+              <div className="product-spec">
+                <dt>OEM</dt>
+                <dd>{product.oem_code}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+
+        <div className="product-price-block">
+          <div className="product-price">{formatCurrency(product.price)}</div>
+          <div className="product-promo-banner">
+            <span>em <strong>12x {calcInstallment(product.price)}</strong> sem juros</span>
+            {Number(product.price) >= freeMin && <span className="product-free-ship">Frete grátis</span>}
+          </div>
+          <span className={inStock ? 'gl-card-stock' : 'gl-card-oos'}>
+            {inStock ? `${product.available_stock ?? product.stock} un. em estoque` : 'Indisponível'}
+          </span>
+          {(product.average_rating > 0) && (
+            <p className="product-rating">★ {product.average_rating} ({product.review_count} avaliações)</p>
+          )}
+        </div>
+
+        <div className="product-buy-block">
+          <div className="qty-row">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQty(Math.max(1, qty - 1))}>−</button>
+            <input value={qty} readOnly />
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQty(Math.min(product.stock || 99, qty + 1))}>+</button>
+            <button type="button" className="btn btn-primary" onClick={handleAdd} disabled={!inStock}>
+              Comprar agora
+            </button>
+          </div>
         </div>
 
         <div className="product-shipping-box">
@@ -172,19 +218,21 @@ export default function Product() {
           <p className="product-shipping-result">{shippingLabel}</p>
         </div>
 
-        <span className={inStock ? 'gl-card-stock' : 'gl-card-oos'}>
-          {inStock ? `${product.available_stock ?? product.stock} un. em estoque` : 'Indisponível'}
-        </span>
-        {(product.average_rating > 0) && (
-          <p className="product-rating">★ {product.average_rating} ({product.review_count} avaliações)</p>
-        )}
-        <p style={{ marginTop: '1rem', color: 'rgba(0,0,0,.65)' }}>
-          {product.description || 'Peça automotiva Galelugi Peças.'}
-        </p>
+        <a href={waUrl} className="btn btn-whatsapp btn-full" target="_blank" rel="noreferrer">
+          Dúvida sobre compatibilidade? WhatsApp
+        </a>
+
+        <div className="product-section">
+          <h2 className="product-section-title">Descrição</h2>
+          <p className="product-section-text">
+            {product.description || 'Peça automotiva Galelugi Peças.'}
+          </p>
+        </div>
+
         {product.vehicle_models?.length > 0 && (
-          <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#ededed', borderRadius: 6 }}>
-            <strong>Veículos compatíveis:</strong>
-            <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
+          <div className="product-section product-section--box">
+            <h2 className="product-section-title">Veículos compatíveis</h2>
+            <ul className="product-compat-list">
               {product.vehicle_models.map((v) => (
                 <li key={`${v.id}-${v.compat_year_start ?? 'a'}-${v.compat_year_end ?? 'a'}`}>
                   {v.brand} {v.name}
@@ -197,22 +245,13 @@ export default function Product() {
           </div>
         )}
         {product.compatible_vehicles && !product.vehicle_models?.length && (
-          <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#ededed', borderRadius: 6 }}>
-            <strong>Compatível:</strong> {product.compatible_vehicles}
+          <div className="product-section product-section--box">
+            <h2 className="product-section-title">Compatível</h2>
+            <p className="product-section-text">{product.compatible_vehicles}</p>
           </div>
         )}
+
         <ProductChat product={product} />
-        <div className="qty-row">
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQty(Math.max(1, qty - 1))}>−</button>
-          <input value={qty} readOnly />
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQty(Math.min(product.stock || 99, qty + 1))}>+</button>
-          <button type="button" className="btn btn-primary" onClick={handleAdd} disabled={!inStock}>
-            Comprar agora
-          </button>
-        </div>
-        <a href={waUrl} className="btn btn-whatsapp btn-full" target="_blank" rel="noreferrer">
-          Dúvida sobre compatibilidade? WhatsApp
-        </a>
       </div>
     </div>
     <div className="wrap product-reviews-wrap">

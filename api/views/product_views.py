@@ -1,12 +1,14 @@
 import re
-from django.db.models import Q, F
+from django.db.models import Q, F, Avg, Count, Sum, OuterRef, Subquery, IntegerField, Value
+from django.db.models.functions import Coalesce
+from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework import status, permissions
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.generics import ListAPIView, RetrieveAPIView
-from api.models import Category, Product, User, OrderItem, OrderStatus, ProductReview
+from api.models import Category, Product, User, OrderItem, OrderStatus, ProductReview, StockReservation
 from api.services.stock_reservation_service import get_available_stock, release_expired_reservations
 from api.services.product_search_service import (
     apply_text_search,
@@ -54,14 +56,27 @@ class ProductListView(ListAPIView):
 
     def get_queryset(self):
         release_expired_reservations()
-        from django.db.models import Avg, Count
+        reserved_subq = (
+            StockReservation.objects.filter(
+                product_id=OuterRef('pk'),
+                released=False,
+                expires_at__gt=timezone.now(),
+            )
+            .values('product_id')
+            .annotate(total=Sum('quantity'))
+            .values('total')
+        )
         qs = (
             Product.objects.filter(is_active=True)
             .select_related('category', 'seller')
             .prefetch_related('vehicle_compatibilities__vehicle_model__brand')
             .annotate(
                 avg_rating=Avg('reviews__rating', filter=Q(reviews__is_visible=True)),
-                review_count=Count('reviews', filter=Q(reviews__is_visible=True)),
+                review_count=Count('reviews', filter=Q(reviews__is_visible=True), distinct=True),
+                reserved_qty=Coalesce(
+                    Subquery(reserved_subq, output_field=IntegerField()),
+                    Value(0),
+                ),
             )
         )
         q = self.request.query_params.get('q', '').strip()
@@ -106,6 +121,7 @@ class ProductDetailView(RetrieveAPIView):
     )
 
     def retrieve(self, request, *args, **kwargs):
+        release_expired_reservations()
         response = super().retrieve(request, *args, **kwargs)
         product = self.get_object()
         from api.models import ProductViewEvent

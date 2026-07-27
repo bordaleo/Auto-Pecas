@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { api, getToken } from '../api/client';
 import { useToast } from '../context/ToastContext';
 
@@ -8,13 +8,6 @@ export default function ProductChat({ product }) {
   const [convId, setConvId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
-  const [waUrl, setWaUrl] = useState('');
-
-  useEffect(() => {
-    if (product?.id) {
-      api(`/products/${product.id}/whatsapp/`).then((d) => setWaUrl(d.url || '')).catch(() => {});
-    }
-  }, [product?.id]);
 
   const startChat = async () => {
     if (!getToken()) {
@@ -58,21 +51,14 @@ export default function ProductChat({ product }) {
     }
   };
 
-  if (!product.seller_id && !waUrl) return null;
+  if (!product.seller_id) return null;
 
   return (
     <div className="product-chat">
       <div className="product-chat-actions">
-        {product.seller_id && (
-          <button type="button" className="btn btn-secondary btn-sm" onClick={startChat}>
-            Chat com vendedor
-          </button>
-        )}
-        {waUrl && (
-          <a href={waUrl} className="btn btn-whatsapp btn-sm" target="_blank" rel="noreferrer">
-            WhatsApp {product.seller_name ? `— ${product.seller_name}` : ''}
-          </a>
-        )}
+        <button type="button" className="btn btn-secondary btn-sm" onClick={startChat}>
+          Chat com vendedor
+        </button>
       </div>
 
       {open && convId && (

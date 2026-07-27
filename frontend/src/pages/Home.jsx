@@ -5,6 +5,7 @@ import { useStore } from '../context/StoreContext';
 import HomeHeroZone from '../components/HomeHeroZone';
 import BrandMarquee from '../components/BrandMarquee';
 import ProductCard from '../components/ProductCard';
+import ProductGridSkeleton from '../components/ProductGridSkeleton';
 import SectionHeader from '../components/SectionHeader';
 import HeroSection from '../components/landing/HeroSection';
 import CategoriesSection from '../components/landing/CategoriesSection';
@@ -18,21 +19,43 @@ export default function Home() {
   const [featured, setFeatured] = useState([]);
   const [popular, setPopular] = useState([]);
   const [totalProducts, setTotalProducts] = useState(0);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [popularLoading, setPopularLoading] = useState(true);
   const [catalogError, setCatalogError] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     setCatalogError(false);
-    Promise.all([
-      api('/products/?featured=1'),
-      api('/products/'),
-    ]).then(([featuredData, allData]) => {
-      const all = productList(allData);
-      setFeatured(productList(featuredData).slice(0, 8));
-      setPopular(all.slice(0, 8));
-      setTotalProducts(productCount(allData, all));
-    }).catch(() => {
-      setCatalogError(true);
-    });
+    setFeaturedLoading(true);
+    setPopularLoading(true);
+
+    api('/products/?featured=1&page_size=8')
+      .then((data) => {
+        if (cancelled) return;
+        setFeatured(productList(data).slice(0, 8));
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setFeaturedLoading(false);
+      });
+
+    api('/products/?page_size=8')
+      .then((data) => {
+        if (cancelled) return;
+        const list = productList(data);
+        setPopular(list.slice(0, 8));
+        setTotalProducts(productCount(data, list));
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setPopularLoading(false);
+      });
+
+    return () => { cancelled = true; };
   }, []);
 
   const handleSearch = (query) => {
@@ -62,13 +85,15 @@ export default function Home() {
           href="/pecas/?featured=1"
           linkLabel="Ver todos"
         />
-        <div className="product-grid">
-          {featured.length ? (
-            featured.map((product) => <ProductCard key={product.id} product={product} />)
-          ) : (
-            <p className="state-empty">Nenhum destaque ainda. <Link to="/pecas/">Ver catálogo</Link></p>
-          )}
-        </div>
+        {featuredLoading ? (
+          <ProductGridSkeleton count={8} />
+        ) : featured.length ? (
+          <div className="product-grid">
+            {featured.map((product) => <ProductCard key={product.id} product={product} />)}
+          </div>
+        ) : (
+          <p className="state-empty">Nenhum destaque ainda. <Link to="/pecas/">Ver catálogo</Link></p>
+        )}
       </section>
 
       <TrustSection />
@@ -98,11 +123,15 @@ export default function Home() {
           subtitle="Peças que nossos clientes buscam com frequência"
           href="/pecas/"
         />
-        <div className="product-grid">
-          {popular.map((product) => (
-            <ProductCard key={`pop-${product.id}`} product={product} />
-          ))}
-        </div>
+        {popularLoading ? (
+          <ProductGridSkeleton count={8} />
+        ) : (
+          <div className="product-grid">
+            {popular.map((product) => (
+              <ProductCard key={`pop-${product.id}`} product={product} />
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

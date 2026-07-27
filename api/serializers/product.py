@@ -3,7 +3,7 @@ from rest_framework import serializers
 from django.utils.text import slugify
 from api.models import Category, Product, ProductImage, ProductVehicleCompatibility
 from api.services.seo_service import build_product_seo
-from api.services.stock_reservation_service import get_available_stock, release_expired_reservations
+from api.services.stock_reservation_service import get_available_stock
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -53,7 +53,6 @@ class ProductListSerializer(serializers.ModelSerializer):
             cache = self._seller_meta_cache
         if obj.id in cache:
             return cache[obj.id]
-        from api.models import SystemConfig
         if obj.seller_id:
             cache[obj.id] = {
                 'name': obj.seller.store_name,
@@ -62,13 +61,16 @@ class ProductListSerializer(serializers.ModelSerializer):
                 'ships_from_platform': obj.seller.ships_from_platform,
             }
         else:
-            config = SystemConfig.get_config()
-            cache[obj.id] = {
-                'name': config.store_name or 'Galelugi Peças',
-                'slug': '',
-                'is_official': True,
-                'ships_from_platform': True,
-            }
+            if not hasattr(self, '_default_seller_meta'):
+                from api.models import SystemConfig
+                config = SystemConfig.get_config()
+                self._default_seller_meta = {
+                    'name': config.store_name or 'Galelugi Peças',
+                    'slug': '',
+                    'is_official': True,
+                    'ships_from_platform': True,
+                }
+            cache[obj.id] = self._default_seller_meta
         return cache[obj.id]
 
     def get_seller_name(self, obj):
@@ -87,7 +89,8 @@ class ProductListSerializer(serializers.ModelSerializer):
         return self.get_available_stock(obj) > 0
 
     def get_available_stock(self, obj):
-        release_expired_reservations()
+        if hasattr(obj, 'reserved_qty'):
+            return max(0, int(obj.stock or 0) - int(obj.reserved_qty or 0))
         return get_available_stock(obj)
 
     def get_average_rating(self, obj):
@@ -181,7 +184,6 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         return self.get_available_stock(obj) > 0
 
     def get_available_stock(self, obj):
-        release_expired_reservations()
         return get_available_stock(obj)
 
     def get_average_rating(self, obj):

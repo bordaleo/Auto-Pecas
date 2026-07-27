@@ -17,7 +17,7 @@ from api.services.email_service import email_service
 from api.services.shipping_service import get_pickup_address
 from api.services.shipping_quote_service import quote_cart_shipping, quote_legacy_cart_shipping
 from api.services.marketplace_service import split_sale_amount
-from api.services.checkout_service import build_order_items_from_request, create_orders_from_cart
+from api.services.checkout_service import build_order_items_from_request, create_orders_from_cart, release_user_pending_checkout_reservations
 from api.services.stock_reservation_service import release_order_reservations
 from api.services.payout_service import credit_seller_earnings_for_order
 from api.services.notification_service import notify_buyer_order_paid, notify_seller_new_order
@@ -135,6 +135,8 @@ class CheckoutView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.validated_data
+        # Libera estoque de checkouts pendentes antes de validar disponibilidade
+        release_user_pending_checkout_reservations(request.user)
         try:
             order_items_data = build_order_items_from_request(data, request.user)
         except Product.DoesNotExist:
