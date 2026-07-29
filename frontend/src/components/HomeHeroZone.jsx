@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Search } from 'lucide-react';
+import { Check, Copy, Search } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
+
+const WELCOME_COUPON = 'BEMVINDO10';
 
 const QUICK_TAGS = [
   'Pastilha de freio',
@@ -14,6 +16,7 @@ const QUICK_TAGS = [
 export default function HomeHeroZone({ onSearch }) {
   const { config } = useStore();
   const [query, setQuery] = useState('');
+  const [copied, setCopied] = useState(false);
   const freeShipping = Number(config.free_shipping_min || 299).toFixed(0);
 
   const submit = (value) => {
@@ -31,11 +34,32 @@ export default function HomeHeroZone({ onSearch }) {
     submit(tag);
   };
 
+  const handleCopyCoupon = async () => {
+    try {
+      await navigator.clipboard.writeText(WELCOME_COUPON);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* fallback silencioso */
+    }
+  };
+
   return (
     <section className="home-hero-zone wrap" aria-label="Busca e promoções">
       <div className="home-hero-zone__card">
         <div className="home-hero-zone__promo">
-          <span className="home-hero-zone__code">BEMVINDO10</span>
+          <div className="home-hero-zone__code-wrap">
+            <span className="home-hero-zone__code">{WELCOME_COUPON}</span>
+            <button
+              type="button"
+              className="home-hero-zone__copy"
+              onClick={handleCopyCoupon}
+              aria-label={copied ? 'Código copiado' : `Copiar cupom ${WELCOME_COUPON}`}
+            >
+              {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+              {copied ? 'Copiado!' : 'Copiar'}
+            </button>
+          </div>
           <p className="home-hero-zone__promo-text">
             <strong>10% off na primeira compra</strong>
             <span>Pedido mínimo R$ 50 · use no checkout</span>

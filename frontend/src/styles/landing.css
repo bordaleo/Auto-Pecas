@@ -731,6 +731,13 @@ a.gl-feature-card:hover,
   border-bottom: 1px solid var(--lp-border);
 }
 
+.home-hero-zone__code-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .home-hero-zone__code {
   flex-shrink: 0;
   background: var(--gl-orange);
@@ -740,6 +747,31 @@ a.gl-feature-card:hover,
   letter-spacing: 0.06em;
   padding: 4px 10px;
   border-radius: 6px;
+}
+
+.home-hero-zone__copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--gl-orange);
+  color: var(--gl-orange);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.home-hero-zone__copy:hover {
+  background: var(--gl-orange);
+  color: #fff;
+}
+
+.home-hero-zone__copy:focus-visible {
+  outline: 2px solid var(--gl-orange);
+  outline-offset: 2px;
 }
 
 .home-hero-zone__promo-text {
