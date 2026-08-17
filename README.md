@@ -55,6 +55,7 @@ O servidor Node na porta 3000 serve o React e faz proxy de `/api` para o Django.
 - Frete por CEP ou retirada na loja
 - Conta de usuário, pedidos, painel admin de peças
 - Design inspirado no Mercado Livre (header amarelo, busca central, cards de produto)
+- 
 
 ## Variáveis de ambiente
 
