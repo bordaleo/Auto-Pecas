@@ -665,22 +665,38 @@ button, input, select, textarea { font: inherit; }
 .vehicle-strip-head { margin-bottom: 0.75rem; }
 .vehicle-strip-head h3 { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; }
 .vehicle-strip-head p { font-size: 0.85rem; color: var(--gl-muted); }
-.vehicle-marquee { overflow: hidden; }
+.vehicle-marquee {
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+}
+.vehicle-marquee:focus-visible {
+  outline: 2px solid var(--gl-orange, #E8621A);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+.vehicle-marquee.is-dragging {
+  cursor: grabbing;
+}
+.vehicle-marquee.is-dragging .brand-chip {
+  pointer-events: none;
+}
 .vehicle-track {
   display: flex;
   gap: 0.65rem;
-  animation: glide 45s linear infinite;
   width: max-content;
+  will-change: transform;
 }
-@keyframes glide {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-.vehicle-chip {
+.brand-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.55rem 1rem;
+  gap: 0.55rem;
+  padding: 0.4rem 0.95rem 0.4rem 0.4rem;
   background: var(--gl-surface);
   border: 1px solid var(--gl-border);
   border-radius: 999px;
@@ -688,17 +704,31 @@ button, input, select, textarea { font: inherit; }
   font-size: 0.84rem;
   font-weight: 500;
   white-space: nowrap;
+  text-decoration: none;
 }
-.vehicle-chip:hover { border-color: var(--brand-color); color: var(--gl-text); box-shadow: var(--gl-shadow); }
-.vehicle-chip-logo {
-  width: 30px; height: 30px;
+.brand-chip:hover { border-color: var(--brand-color); color: var(--gl-text); box-shadow: var(--gl-shadow); }
+.brand-chip-logo {
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  padding: 4px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+}
+.brand-chip-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.brand-chip-logo--fallback {
   background: var(--brand-color);
   color: #fff;
   font-size: 0.62rem;
   font-weight: 800;
-  display: grid;
-  place-items: center;
 }
 
 /* ── Product cards ── */

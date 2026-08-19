@@ -917,6 +917,26 @@ a.gl-feature-card:hover,
   margin-top: 0;
 }
 
+.home--enhanced .vehicle-strip-head h3 {
+  color: var(--lp-fg);
+}
+
+.home--enhanced .vehicle-strip-head p {
+  color: var(--lp-fg-muted);
+}
+
+.home--enhanced .brand-chip {
+  background: var(--lp-surface);
+  border-color: var(--lp-border);
+  color: var(--lp-fg);
+}
+
+.home--enhanced .brand-chip:hover {
+  border-color: var(--gl-orange);
+  background: var(--lp-surface-hover);
+  color: var(--lp-fg);
+}
+
 @media (max-width: 640px) {
   .home-hero-zone__promo {
     flex-direction: column;
