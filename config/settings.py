@@ -2,6 +2,7 @@
 Django settings for config project.
 """
 from pathlib import Path
+from urllib.parse import urlparse
 import os
 import dj_database_url
 import cloudinary
@@ -113,13 +114,47 @@ if not DATABASE_URL:
     )
 
 # dj-database-url lida com postgres://, postgresql://, SSL (Render adiciona sslmode na URL)
+_db_host = (urlparse(DATABASE_URL).hostname or '').lower()
+_is_neon = 'neon.tech' in _db_host
+_is_pooler = '-pooler' in _db_host
+
 DATABASES = {
     'default': dj_database_url.config(
         default=DATABASE_URL,
-        conn_max_age=600,
+        # Pooler (PgBouncer) e Neon scale-to-zero não combinam com conexão persistente.
+        conn_max_age=0 if (_is_neon or _is_pooler) else 600,
         conn_health_checks=True,
+        ssl_require=_is_neon,
     )
 }
+
+DATABASES['default'].setdefault('OPTIONS', {})
+DATABASES['default']['OPTIONS'].setdefault('connect_timeout', 30)
+
+if _is_neon:
+    import time as _db_time
+
+    import psycopg2 as _psycopg2
+    from django.db.backends.postgresql.base import DatabaseWrapper as _PGWrapper
+
+    _orig_pg_connect = _PGWrapper.get_new_connection
+
+    def _get_new_connection_with_retry(self, conn_params):
+        """Neon suspende o compute: o 1º SSL costuma resetar; tenta de novo."""
+        delay = 1.0
+        attempts = 5
+        for attempt in range(1, attempts + 1):
+            try:
+                return _orig_pg_connect(self, conn_params)
+            except _psycopg2.OperationalError as exc:
+                msg = str(exc).lower()
+                fatal = 'password authentication failed' in msg or 'permission denied' in msg
+                if fatal or attempt == attempts:
+                    raise
+                _db_time.sleep(delay)
+                delay = min(delay * 1.7, 6)
+
+    _PGWrapper.get_new_connection = _get_new_connection_with_retry
 
 
 # Password validation
