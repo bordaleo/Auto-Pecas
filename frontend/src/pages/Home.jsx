@@ -66,10 +66,9 @@ export default function Home() {
     <div className="home home--enhanced">
       <HomeHeroZone onSearch={handleSearch} />
       <HeroSection />
+      <BrandMarquee />
       <CategoriesSection />
       <WhyUsSection />
-
-      <BrandMarquee />
 
       {catalogError && (
         <p className="state-empty wrap" style={{ marginTop: '1rem' }}>
