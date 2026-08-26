@@ -31,13 +31,13 @@ export default function Header({ onOpenAuth, onOpenSidebar }) {
         <div className="wrap header-main-inner">
           <div className="header-left">
             <SidebarToggle onClick={onOpenSidebar} />
-            <Link to="/" className="header-brand header-brand--mobile" aria-label="Galelugi Peças — Início">
+            <Link to="/" className="header-brand header-brand--mobile" aria-label="Richsman — Início">
               <Logo light compact />
             </Link>
           </div>
 
           {isHome ? (
-            <Link to="/" className="header-brand header-brand--center" aria-label="Galelugi Peças — Início">
+            <Link to="/" className="header-brand header-brand--center" aria-label="Richsman — Início">
               <Logo light />
             </Link>
           ) : (
