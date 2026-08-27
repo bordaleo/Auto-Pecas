@@ -11,7 +11,7 @@ export default function HeroSection() {
   return (
     <section className="gl-hero">
       <div className="gl-hero__content">
-        <span className="gl-hero__eyebrow">Richsman</span>
+        <span className="gl-hero__eyebrow">Catálogo Galelugi</span>
 
         <h1 className="gl-hero__title">
           A peça certa <em>para o seu veículo</em>

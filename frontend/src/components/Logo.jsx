@@ -18,10 +18,12 @@ export default function Logo({ compact = false, light = false }) {
           </linearGradient>
         </defs>
       </svg>
-      <span className="gl-logo-type">
-        <span className="gl-logo-word">Richsman</span>
-        {!compact && <span className="gl-logo-sub">Peças Automotivas</span>}
-      </span>
+      {!compact && (
+        <span className="gl-logo-type">
+          <span className="gl-logo-word">Galelugi</span>
+          <span className="gl-logo-sub">Peças Automotivas</span>
+        </span>
+      )}
     </span>
   );
 }

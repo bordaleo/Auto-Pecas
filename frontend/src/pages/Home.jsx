@@ -66,7 +66,6 @@ export default function Home() {
     <div className="home home--enhanced">
       <HomeHeroZone onSearch={handleSearch} />
       <HeroSection />
-      <p className="gl-landing-brand">Richsman</p>
       <BrandMarquee />
       <CategoriesSection />
       <WhyUsSection />
@@ -136,3 +135,4 @@ export default function Home() {
     </div>
   );
 }
+

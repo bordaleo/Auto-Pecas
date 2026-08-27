@@ -111,8 +111,11 @@ export default function SideNav({ open, onClose }) {
           Suporte WhatsApp
         </a>
 
-        <div className="sidebar-theme">
-          <ThemeToggle className="theme-toggle--sidebar" showLabel />
+        <div className="sidebar-bottom">
+          <div className="sidebar-theme">
+            <ThemeToggle className="theme-toggle--sidebar" showLabel />
+          </div>
+          <p className="sidebar-credit">richsman</p>
         </div>
       </aside>
     </>

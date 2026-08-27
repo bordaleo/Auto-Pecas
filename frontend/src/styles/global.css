@@ -76,7 +76,6 @@ button, input, select, textarea { font: inherit; }
 /* ── Logo ── */
 .gl-logo { display: inline-flex; align-items: center; gap: 0.7rem; }
 .gl-logo--compact .gl-logo-mark { width: 36px; height: 36px; }
-.gl-logo--compact .gl-logo-word { font-size: 1.05rem; }
 .gl-logo--light .gl-logo-word,
 .gl-logo--light .gl-logo-sub { color: #fff; }
 .gl-logo-mark { flex-shrink: 0; }
