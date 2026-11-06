@@ -103,17 +103,20 @@ class OrderAdmin(admin.ModelAdmin):
     status_display.short_description = 'Status'
 
     def mark_as_approved(self, request, queryset):
-        from api.views.shop_views import approve_shop_order
+        from api.services.order_payment_service import approve_shop_order
         for order in queryset:
             approve_shop_order(order)
         self.message_user(request, f'{queryset.count()} pedido(s) aprovado(s).')
     mark_as_approved.short_description = 'Marcar como aprovado'
 
     def mark_as_rejected(self, request, queryset):
-        from api.views.shop_views import reject_shop_order
-        for order in queryset:
-            reject_shop_order(order)
-        self.message_user(request, f'{queryset.count()} pedido(s) rejeitado(s).')
+        from api.services.order_payment_service import reject_shop_order
+        rejected = sum(1 for order in queryset if reject_shop_order(order))
+        skipped = queryset.count() - rejected
+        msg = f'{rejected} pedido(s) rejeitado(s).'
+        if skipped:
+            msg += f' {skipped} ignorado(s) por já estarem pagos.'
+        self.message_user(request, msg)
     mark_as_rejected.short_description = 'Marcar como rejeitado'
 
     def mark_as_pending(self, request, queryset):

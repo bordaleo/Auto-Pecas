@@ -13,15 +13,11 @@ from api.serializers.shop import (
     CartSyncSerializer,
 )
 from api.services.payment_service import payment_service
-from api.services.email_service import email_service
 from api.services.shipping_service import get_pickup_address
 from api.services.shipping_quote_service import quote_cart_shipping, quote_legacy_cart_shipping
 from api.services.marketplace_service import split_sale_amount
 from api.services.checkout_service import build_order_items_from_request, create_orders_from_cart, release_user_pending_checkout_reservations
-from api.services.stock_reservation_service import release_order_reservations
-from api.services.payout_service import credit_seller_earnings_for_order
-from api.services.notification_service import notify_buyer_order_paid, notify_seller_new_order
-from api.services.coupon_service import validate_coupon, apply_coupon_usage
+from api.services.coupon_service import validate_coupon
 from api.services.abandoned_cart_service import sync_abandoned_cart, mark_cart_recovered
 import logging
 
@@ -147,7 +143,6 @@ class CheckoutView(APIView):
         subtotal = sum(i['unit_price'] * i['quantity'] for i in order_items_data)
         discount_amount = Decimal('0.00')
         coupon_code = ''
-        coupon_obj = None
 
         coupon_input = (data.get('coupon_code') or '').strip()
         if coupon_input:
@@ -165,9 +160,6 @@ class CheckoutView(APIView):
             )
         except ValueError as e:
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-        if coupon_obj:
-            apply_coupon_usage(coupon_obj)
 
         mark_cart_recovered(request.user.email)
 
@@ -290,59 +282,3 @@ class ShopOrderDetailView(APIView):
             return Response({'detail': 'Pedido não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
         return Response(ShopOrderSerializer(order).data)
 
-
-def _orders_in_payment_scope(order):
-    if order.order_group_id:
-        return list(order.order_group.orders.all())
-    return [order]
-
-
-def reject_shop_order(order):
-    """Rejeita pedido (e grupo) e libera reservas."""
-    for sub in _orders_in_payment_scope(order):
-        if sub.status == OrderStatus.REJECTED:
-            continue
-        sub.status = OrderStatus.REJECTED
-        sub.save(update_fields=['status', 'updated_at'])
-        release_order_reservations(sub.id)
-    if order.order_group_id:
-        from api.models import OrderGroup
-        OrderGroup.objects.filter(pk=order.order_group_id).update(status=OrderStatus.REJECTED)
-
-
-def _approve_single_order(sub):
-    if sub.status == OrderStatus.APPROVED:
-        return
-    sub.status = OrderStatus.APPROVED
-    sub.save(update_fields=['status', 'updated_at'])
-    for item in sub.items.select_related('product').all():
-        if item.product_id:
-            product = Product.objects.select_for_update().get(pk=item.product_id)
-            product.stock = max(0, product.stock - item.quantity)
-            product.save(update_fields=['stock', 'updated_at'])
-    credit_seller_earnings_for_order(sub)
-    release_order_reservations(sub.id)
-    if sub.fulfillment_seller_id:
-        item_count = sub.items.count()
-        notify_seller_new_order(sub.fulfillment_seller, sub, item_count)
-
-
-def approve_shop_order(order):
-    """Aprova pedido ou grupo inteiro."""
-    if order.order_group_id and order.order_group.status == OrderStatus.APPROVED:
-        return
-    if not order.order_group_id and order.status == OrderStatus.APPROVED:
-        return
-
-    with transaction.atomic():
-        for sub in _orders_in_payment_scope(order):
-            _approve_single_order(sub)
-        if order.order_group_id:
-            from api.models import OrderGroup
-            OrderGroup.objects.filter(pk=order.order_group_id).update(status=OrderStatus.APPROVED)
-
-    notify_buyer_order_paid(order)
-    try:
-        email_service.send_order_confirmation(order)
-    except Exception as e:
-        logger.error('Erro ao enviar email de confirmação do pedido #%s: %s', order.id, e)

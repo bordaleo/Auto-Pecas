@@ -4,6 +4,7 @@ Django settings for config project.
 from pathlib import Path
 from urllib.parse import urlparse
 import os
+import sys
 import dj_database_url
 import cloudinary
 from dotenv import load_dotenv
@@ -106,6 +107,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # PostgreSQL obrigatório - usa dj-database-url (compatível com Render, Heroku, etc.)
 DATABASE_URL = cfg('DATABASE_URL')
 
+# `manage.py test` nunca cria banco de teste no Postgres do .env; use TEST_DATABASE_URL para testar em Postgres.
+RUNNING_TESTS = len(sys.argv) > 1 and sys.argv[1] == 'test'
+if RUNNING_TESTS:
+    DATABASE_URL = cfg('TEST_DATABASE_URL') or 'sqlite://:memory:'
+
 if not DATABASE_URL:
     raise ValueError(
         "DATABASE_URL não configurado. PostgreSQL é obrigatório. "
@@ -119,8 +125,8 @@ _is_neon = 'neon.tech' in _db_host
 _is_pooler = '-pooler' in _db_host
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default=DATABASE_URL,
+    'default': dj_database_url.parse(
+        DATABASE_URL,
         # Pooler (PgBouncer) e Neon scale-to-zero não combinam com conexão persistente.
         conn_max_age=0 if (_is_neon or _is_pooler) else 600,
         conn_health_checks=True,
@@ -129,7 +135,8 @@ DATABASES = {
 }
 
 DATABASES['default'].setdefault('OPTIONS', {})
-DATABASES['default']['OPTIONS'].setdefault('connect_timeout', 30)
+if 'postgresql' in DATABASES['default']['ENGINE']:
+    DATABASES['default']['OPTIONS'].setdefault('connect_timeout', 30)
 
 if _is_neon:
     import time as _db_time
