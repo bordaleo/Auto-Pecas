@@ -1,28 +1,18 @@
-import json
 import logging
 import re
 
-from django.conf import settings
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.models import Order, OrderGroup, OrderStatus
+from api.models import Order, OrderGroup
 from api.serializers.payment import PaymentStatusSerializer
+from api.services.order_payment_service import apply_mp_payment, payable_amount
 from api.services.payment_service import payment_service
 
 logger = logging.getLogger(__name__)
-
-_MP_OPEN = frozenset({"pending", "in_process", "authorized", "in_mediation"})
-
-
-def _payment_id_int(payment: dict) -> int:
-    try:
-        return int(payment.get("id") or 0)
-    except (TypeError, ValueError):
-        return 0
 
 
 def _find_order(payment_info: dict, payment_id: str) -> Order | None:
@@ -41,38 +31,26 @@ def _find_order(payment_info: dict, payment_id: str) -> Order | None:
                 return Order.objects.get(id=int(match.group(1)))
             except Order.DoesNotExist:
                 pass
-    try:
-        return Order.objects.get(payment_id=str(payment_id))
-    except Order.DoesNotExist:
-        pass
+    order = Order.objects.filter(payment_id=str(payment_id)).first()
+    if order:
+        return order
     pref = payment_info.get("preference_id")
     if pref:
-        try:
-            group = OrderGroup.objects.filter(payment_preference_id=pref).first()
-            if group:
-                return group.orders.first()
-            return Order.objects.get(payment_preference_id=pref)
-        except Order.DoesNotExist:
-            pass
+        group = OrderGroup.objects.filter(payment_preference_id=pref).first()
+        if group:
+            return group.orders.first()
+        return Order.objects.filter(payment_preference_id=pref).first()
     return None
 
 
-def _sync_payment_ids(order, payment_id: str, payment_method: str = ''):
-    if order.order_group_id:
-        group = order.order_group
-        group.payment_id = payment_id
-        if payment_method:
-            group.payment_method = payment_method
-        group.save(update_fields=['payment_id', 'payment_method', 'updated_at'])
-        Order.objects.filter(order_group=group).update(
-            payment_id=payment_id,
-            payment_method=payment_method or group.payment_method,
-        )
-    else:
-        order.payment_id = payment_id
-        if payment_method:
-            order.payment_method = payment_method
-        order.save(update_fields=['payment_id', 'payment_method', 'updated_at'])
+def _order_for_preference(preference_id: str, user) -> Order | None:
+    """Pedido principal da preferência. Em checkout multi-vendedor, todos os sub-pedidos a compartilham."""
+    return (
+        Order.objects.filter(payment_preference_id=preference_id, user=user)
+        .select_related("order_group")
+        .order_by("pk")
+        .first()
+    )
 
 
 class PaymentProcessView(APIView):
@@ -86,13 +64,12 @@ class PaymentProcessView(APIView):
         if not isinstance(form_data, dict):
             return Response({"detail": "form_data inválido."}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            order = Order.objects.get(payment_preference_id=preference_id, user=request.user)
-        except Order.DoesNotExist:
+        order = _order_for_preference(preference_id, request.user)
+        if not order:
             return Response({"detail": "Pedido não encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
         payload = dict(form_data)
-        payload["transaction_amount"] = float(order.amount)
+        payload["transaction_amount"] = float(payable_amount(order))
         payload["description"] = f"Pedido Galelugi Peças #{order.id}"
         payload["external_reference"] = (
             f"group_{order.order_group_id}_user_{request.user.id}"
@@ -115,19 +92,9 @@ class PaymentProcessView(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
             return Response({"detail": "Não foi possível processar o pagamento."}, status=status.HTTP_400_BAD_REQUEST)
 
-        mp_status = payment.get("status")
-        pm = payment.get("payment_method_id") or order.payment_method
-        _sync_payment_ids(order, str(payment.get("id") or order.payment_id or ""), pm)
-        if mp_status == "approved":
-            from api.views.shop_views import approve_shop_order
-            approve_shop_order(order)
-            order.refresh_from_db()
-        elif mp_status in ["rejected", "cancelled", "refunded"]:
-            from api.views.shop_views import reject_shop_order
-            reject_shop_order(order)
-        else:
-            order.status = OrderStatus.PENDING
-            Order.objects.filter(pk=order.pk).update(status=OrderStatus.PENDING)
+        if not payment.get("payment_method_id") and order.payment_method:
+            payment = {**payment, "payment_method_id": order.payment_method}
+        mp_status = apply_mp_payment(order, payment)
 
         tx = (payment.get("point_of_interaction") or {}).get("transaction_data") or {}
         return Response({
@@ -161,19 +128,7 @@ class PaymentWebhookView(APIView):
             if not order:
                 return Response({"status": "error"}, status=status.HTTP_404_NOT_FOUND)
 
-            mp_status = payment_info.get("status")
-            pm = payment_info.get("payment_method_id")
-            _sync_payment_ids(order, str(payment_id), pm or '')
-
-            if mp_status == "approved":
-                from api.views.shop_views import approve_shop_order
-                approve_shop_order(order)
-            elif mp_status in ["rejected", "cancelled", "refunded"]:
-                from api.views.shop_views import reject_shop_order
-                reject_shop_order(order)
-            else:
-                order.save(update_fields=['updated_at'])
-
+            apply_mp_payment(order, {**payment_info, "id": payment_info.get("id") or payment_id})
             return Response({"status": "ok"})
         except Exception as e:
             logger.exception("Webhook MP: %s", e)
@@ -184,22 +139,15 @@ class PaymentStatusView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, preference_id):
-        try:
-            order = Order.objects.get(payment_preference_id=preference_id, user=request.user)
-        except Order.DoesNotExist:
+        order = _order_for_preference(preference_id, request.user)
+        if not order:
             return Response({"detail": "Pedido não encontrado."}, status=status.HTTP_404_NOT_FOUND)
 
         if order.payment_id:
             payment = payment_service.get_payment(order.payment_id)
             if payment:
-                mp_status = payment.get("status")
-                if mp_status == "approved" and order.status != OrderStatus.APPROVED:
-                    from api.views.shop_views import approve_shop_order
-                    approve_shop_order(order)
-                elif mp_status in ["rejected", "cancelled", "refunded"]:
-                    from api.views.shop_views import reject_shop_order
-                    reject_shop_order(order)
-                    order.save(update_fields=['updated_at'])
+                apply_mp_payment(order, payment)
+                order.refresh_from_db()
 
         return Response(PaymentStatusSerializer({
             "order_id": order.id,
@@ -208,7 +156,7 @@ class PaymentStatusView(APIView):
             "payment_id": order.payment_id,
             "payment_method": order.payment_method,
             "payment_preference_id": order.payment_preference_id,
-            "amount": order.amount,
+            "amount": payable_amount(order),
             "created_at": order.created_at,
             "updated_at": order.updated_at,
         }).data)
